@@ -1,4 +1,4 @@
-package com.example.knight_shift
+package com.wiseapps.knightshift
 
 import io.flutter.embedding.android.FlutterActivity
 
