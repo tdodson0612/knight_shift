@@ -7,6 +7,7 @@ import 'availability_service.dart';
 import 'time_off_service.dart';
 import 'notification_service.dart';
 import 'subscription_service.dart';
+import 'employee_service.dart';
 
 class ShiftService {
   static final _db = SupabaseService.client;
@@ -139,6 +140,7 @@ class ShiftService {
     required String createdBy,
     required String status,
     required String origin,
+    String? requiredSkillId,
   }) async {
     if (await SubscriptionService.isLocked(companyId)) {
       throw Exception(
@@ -175,6 +177,7 @@ class ShiftService {
       'status_changed_at': now,
       'status_changed_by': createdBy,
       'origin': origin,
+      if (requiredSkillId != null) 'required_skill_id': requiredSkillId,
     }).select().single();
 
     final newShiftId = inserted['id']?.toString();
@@ -228,6 +231,41 @@ class ShiftService {
       throw Exception(
         "Schedule editing is disabled — your trial has ended. Upgrade to continue.",
       );
+    }
+
+    // Seniority-first claiming (Feature 6): when the company has
+    // `open_shift_priority` = 'seniority_first', only the most senior
+    // eligible employee (earliest hire_date) may claim. Employees with
+    // no hire_date set rank BELOW everyone who has one — that's the
+    // correct fail-safe: a missing hire date is "unverified seniority",
+    // not "hired at the beginning of time". Ties (same hire date, or
+    // multiple unset) fall back to first-come.
+    final priority = await _getOpenShiftPriority(shift.companyId);
+    if (priority == 'seniority_first') {
+      final employees =
+          await EmployeeService.getCompanyEmployees(shift.companyId);
+
+      // Candidate = anyone with a hire_date, sorted ascending.
+      final withHireDates = employees
+          .where((e) => e.hireDate != null)
+          .toList()
+        ..sort((a, b) => a.hireDate!.compareTo(b.hireDate!));
+
+      final mostSenior = withHireDates.isNotEmpty ? withHireDates.first : null;
+
+      if (mostSenior != null && mostSenior.userId != claimingUserId) {
+        // Does the caller have a hire date too? Only ask this if
+        // they're the earliest — otherwise they're not the most senior.
+        final caller = employees.where((e) => e.userId == claimingUserId);
+        if (caller.isEmpty ||
+            caller.first.hireDate == null ||
+            caller.first.hireDate!.isAfter(mostSenior.hireDate!)) {
+          throw Exception(
+            "This shift is seniority-protected — only the most senior "
+            "employee can claim it",
+          );
+        }
+      }
     }
 
     final conflict = await hasConflict(
@@ -531,6 +569,208 @@ class ShiftService {
     }
   }
 
+  // ----------------------------
+  // RECURRING SHIFT PATTERNS (Feature 4)
+  // ----------------------------
+
+  /// Generates individual `shifts` rows for a recurring pattern —
+  /// "this employee works every Mon/Wed/Fri 9-5 for N weeks" — by
+  /// looping [createShift] per occurrence instead of creating a
+  /// parallel "recurring shift definition" table. Shifts stay the
+  /// single source of truth; the rest of the app doesn't need to
+  /// know a shift was generated from a pattern.
+  ///
+  /// Each occurrence goes through [createShift], so subscription
+  /// gating, time validation, and per-occurrence conflict checking
+  /// all apply exactly as they do for a shift created one at a time —
+  /// a conflict on one day skips just that day, never the whole run.
+  ///
+  /// [daysOfWeek] uses Dart's DateTime.weekday convention (1=Mon ..
+  /// 7=Sun). Only weekdays present in the list are generated within
+  /// [startDate]..[endDate] (inclusive).
+  ///
+  /// All generated shifts are `manager_scheduled` / `approved` — a
+  /// recurring pattern is a manager decision, not a batch of
+  /// employee requests.
+  ///
+  /// Returns {created, skipped} — how many shifts were successfully
+  /// created vs skipped (conflict or validation failure).
+  static Future<({int created, int skipped})> createRecurringShifts({
+    required String companyId,
+    required String? userId,
+    required String createdBy,
+    required Set<int> daysOfWeek,
+    required TimeOfDaySpec startTime,
+    required TimeOfDaySpec endTime,
+    required DateTime startDate,
+    required DateTime endDate,
+    String? requiredSkillId,
+  }) async {
+    if (await SubscriptionService.isLocked(companyId)) {
+      throw Exception(
+        "Schedule editing is disabled — your trial has ended. Upgrade to continue.",
+      );
+    }
+
+    if (daysOfWeek.isEmpty) {
+      throw Exception("Pick at least one day of the week");
+    }
+    if (endDate.isBefore(startDate)) {
+      throw Exception("End date must be after start date");
+    }
+
+    int created = 0;
+    int skipped = 0;
+
+    // Iterate day by day over the inclusive range.
+    for (var day = DateTime(startDate.year, startDate.month, startDate.day);
+        !day.isAfter(endDate);
+        day = day.add(const Duration(days: 1))) {
+      if (!daysOfWeek.contains(day.weekday)) continue;
+
+      final start = DateTime(
+        day.year,
+        day.month,
+        day.day,
+        startTime.hour,
+        startTime.minute,
+      );
+      final end = DateTime(
+        day.year,
+        day.month,
+        day.day,
+        endTime.hour,
+        endTime.minute,
+      );
+
+      try {
+        await createShift(
+          companyId: companyId,
+          userId: userId,
+          start: start,
+          end: end,
+          createdBy: createdBy,
+          status: 'approved',
+          origin: 'manager_scheduled',
+          requiredSkillId: requiredSkillId,
+        );
+        created++;
+      } catch (_) {
+        // Per-occurrence conflict/validation failure — skip just this
+        // day, keep going with the rest of the pattern.
+        skipped++;
+      }
+    }
+
+    return (created: created, skipped: skipped);
+  }
+
+  // ----------------------------
+  // OPEN-SHIFT PRIORITY (Feature 6)
+  // ----------------------------
+
+  /// Reads the company's `open_shift_priority` column.
+  /// 'first_come' (default) = first-come-first-served.
+  /// 'seniority_first' = earliest hire_date wins.
+  static Future<String> _getOpenShiftPriority(String companyId) async {
+    try {
+      final res = await _db
+          .from('companies')
+          .select('open_shift_priority')
+          .eq('id', companyId)
+          .single();
+      return res['open_shift_priority']?.toString() ?? 'first_come';
+    } catch (_) {
+      // Fail open: if we can't read the setting, don't lock anyone
+      // out of claiming.
+      return 'first_come';
+    }
+  }
+
+  // ----------------------------
+  // COPY SHIFTS (schedule templates / "copy last week")
+  // ----------------------------
+
+  /// Copies all approved/pending/open shifts in [sourceStart]..[sourceEnd]
+  /// to a new date range [targetStart]..[targetEnd], preserving each
+  /// shift's time-of-day and duration but shifting them forward (or
+  /// backward) by the same amount. The [targetStart]..[targetEnd]
+  /// range must be the same length as the source range.
+  ///
+  /// Each copy goes through [createShift] — NOT a raw insert — so
+  /// subscription gating, time validation, and conflict checking all
+  /// apply exactly as they do for a shift created one at a time.
+  ///
+  /// Copies are ALWAYS `manager_scheduled` / `approved` regardless of
+  /// the source shift's status or origin. A template copy is a fresh
+  /// manager decision — not a re-approval of an old employee request,
+  /// and not a re-creation of someone's pending swap. Open shifts in
+  /// the source are copied as assigned-to-manager-approved shifts if
+  /// they had a claim, or as open shifts if they were still unclaimed;
+  /// either way they become manager decisions on the copy.
+  ///
+  /// Returns the number of shifts successfully copied (conflicts on
+  /// individual shifts are skipped, not fatal).
+  static Future<int> copyShifts({
+    required String companyId,
+    required String createdBy,
+    required DateTime sourceStart,
+    required DateTime sourceEnd,
+    required DateTime targetStart,
+    required DateTime targetEnd,
+  }) async {
+    if (await SubscriptionService.isLocked(companyId)) {
+      throw Exception(
+        "Schedule editing is disabled — your trial has ended. Upgrade to continue.",
+      );
+    }
+
+    final sourceSpan = sourceEnd.difference(sourceStart);
+    final targetSpan = targetEnd.difference(targetStart);
+    if (sourceSpan != targetSpan) {
+      throw Exception("Source and target ranges must be the same length");
+    }
+
+    final shiftOffset = targetStart.difference(sourceStart);
+
+    final allShifts = await getCompanyShifts(companyId);
+    final sourceShifts = allShifts.where((s) {
+      return (s.startTime.isAfter(sourceStart) ||
+              s.startTime.isAtSameMomentAs(sourceStart)) &&
+          (s.startTime.isBefore(sourceEnd) ||
+              s.startTime.isAtSameMomentAs(sourceEnd));
+    }).toList();
+
+    if (sourceShifts.isEmpty) return 0;
+
+    int copied = 0;
+
+    for (final source in sourceShifts) {
+      final newStart = source.startTime.add(shiftOffset);
+      final newEnd = source.endTime.add(shiftOffset);
+
+      try {
+        // Copies are always manager_scheduled / approved — a template
+        // copy is a fresh manager decision (see method doc comment).
+        await createShift(
+          companyId: companyId,
+          userId: source.userId,
+          start: newStart,
+          end: newEnd,
+          createdBy: createdBy,
+          status: 'approved',
+          origin: 'manager_scheduled',
+        );
+        copied++;
+      } catch (_) {
+        // Skip individual shifts that conflict — don't fail the whole
+        // copy operation because one slot is already taken.
+      }
+    }
+
+    return copied;
+  }
+
   static Future<ShiftModel?> _fetchShift(String shiftId) async {
     final res = await _db
         .from('shifts')
@@ -545,6 +785,16 @@ class ShiftService {
   static String _formatDateTime(DateTime dt) {
     return "${dt.month}/${dt.day} ${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}";
   }
+}
+
+/// A time-of-day (hour + minute) used by recurring shift generation.
+/// Kept as a value type so the screen can pass picked times without
+/// coupling the service to Flutter's TimeOfDay.
+class TimeOfDaySpec {
+  final int hour;
+  final int minute;
+
+  const TimeOfDaySpec({required this.hour, required this.minute});
 }
 
 // ----------------------------

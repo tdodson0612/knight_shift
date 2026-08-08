@@ -19,6 +19,7 @@ import '../incident_reports/incident_report_submit_screen.dart';
 import '../../core/services/geofence_service.dart';
 import '../../shared/models/geofence_settings_model.dart';
 import 'package:geolocator/geolocator.dart';
+import '../../core/services/clock_in_photo_service.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -182,12 +183,52 @@ class _HomeScreenState extends State<HomeScreen> {
           return;
         }
 
+        String? photoPath;
+        bool photoRequired = false;
+        try {
+          photoRequired = await ClockInPhotoService.isRequired(companyId);
+        } catch (_) {
+          photoRequired = false; // can't check — don't block clock-in
+        }
+
+        if (photoRequired) {
+          try {
+            photoPath = await ClockInPhotoService.captureAndUpload(
+              companyId: companyId,
+              userId: user.id,
+            );
+          } catch (e) {
+            if (mounted) {
+              setState(() => loading = false);
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(content: Text("Couldn't upload photo: \$e"), backgroundColor: Colors.red),
+              );
+            }
+            return;
+          }
+
+          if (photoPath == null) {
+            // Cancelled the camera — required means required, don't
+            // silently let them through.
+            if (mounted) {
+              setState(() => loading = false);
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text("This company requires a photo to clock in"),
+                ),
+              );
+            }
+            return;
+          }
+        }
+
         final res = await Supabase.instance.client
             .from('time_entries')
             .insert({
               'user_id': user.id,
               'company_id': companyId,
               'clock_in': DateTime.now().toIso8601String(),
+              if (photoPath != null) 'clock_in_photo_path': photoPath,
             })
             .select()
             .single();

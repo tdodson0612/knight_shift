@@ -8,6 +8,11 @@ class EmployeeProfile {
   final String companyId;
   final double hourlyRate;
 
+  /// Employee's actual hire date at the company (manager-set). Used
+  /// as the seniority signal for seniority-first open-shift claiming.
+  /// Null until a manager sets it.
+  final DateTime? hireDate;
+
   EmployeeProfile({
     required this.userId,
     required this.displayName,
@@ -15,6 +20,7 @@ class EmployeeProfile {
     required this.email,
     required this.companyId,
     this.hourlyRate = 20,
+    this.hireDate,
   });
 
   factory EmployeeProfile.fromMap(Map<String, dynamic> map) {
@@ -25,6 +31,9 @@ class EmployeeProfile {
       email: map['email'] ?? '',
       companyId: map['company_id'] ?? '',
       hourlyRate: (map['hourly_rate'] ?? 20).toDouble(),
+      hireDate: map['hire_date'] == null
+          ? null
+          : DateTime.tryParse(map['hire_date'].toString()),
     );
   }
 
@@ -36,6 +45,7 @@ class EmployeeProfile {
       'email': email,
       'company_id': companyId,
       'hourly_rate': hourlyRate,
+      'hire_date': hireDate?.toIso8601String().split('T').first,
     };
   }
 

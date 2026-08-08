@@ -16,6 +16,12 @@ class ShiftModel {
 
   final String? swapTargetUserId;
 
+  /// Optional skill a shift requires (e.g. "bartender"). Advisory
+  /// only — a manager assigning someone without this skill gets a
+  /// warning, never a block (same fail-open philosophy as the
+  /// availability check).
+  final String? requiredSkillId;
+
   // Permanent record of how this shift was created:
   //   employee_request | manager_scheduled | open_posted
   // Set once at insert, never overwritten — this is what makes
@@ -37,6 +43,7 @@ class ShiftModel {
     this.statusChangedBy,
     this.managerNote,
     this.swapTargetUserId,
+    this.requiredSkillId,
     this.origin,
   });
 
@@ -58,6 +65,7 @@ class ShiftModel {
       statusChangedBy: map['status_changed_by']?.toString(),
       managerNote: map['manager_note']?.toString(),
       swapTargetUserId: map['swap_target_user_id']?.toString(),
+      requiredSkillId: map['required_skill_id']?.toString(),
       origin: map['origin']?.toString(),
     );
   }
@@ -75,6 +83,7 @@ class ShiftModel {
       'status_changed_by': statusChangedBy,
       'manager_note': managerNote,
       'swap_target_user_id': swapTargetUserId,
+      'required_skill_id': requiredSkillId,
       'origin': origin,
     };
   }

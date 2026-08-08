@@ -72,7 +72,14 @@ class SessionService {
   // HELPERS
   // ----------------------------
 
-  static bool get isManager => activeRole == 'manager';
+  // NOTE: an `isManager` getter used to live here, checking only
+  // `activeRole == 'manager'` — silently excluding 'admin', unlike
+  // RoleService.isManager() (the actual source of truth everywhere
+  // else in this app, per the project's own convention: "never check
+  // roles inline in UI"). Confirmed zero call sites via
+  // `grep -rn "SessionService.isManager" lib/` before removing it —
+  // it was dead code, not a behavior change for anything live. Use
+  // RoleService.isManager() for any manager check.
   static bool get hasCompany => activeCompanyId != null;
 
   // ----------------------------

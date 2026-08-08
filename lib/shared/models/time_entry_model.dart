@@ -6,6 +6,7 @@ class TimeEntry {
   final String userId;
   final DateTime clockIn;
   final DateTime? clockOut;
+  final String? clockInPhotoPath;
 
   const TimeEntry({
     required this.id,
@@ -13,9 +14,11 @@ class TimeEntry {
     required this.userId,
     required this.clockIn,
     this.clockOut,
+    this.clockInPhotoPath,
   });
 
   bool get isOpen => clockOut == null;
+  bool get hasPhoto => clockInPhotoPath != null;
 
   Duration? get duration => clockOut?.difference(clockIn);
 
@@ -28,6 +31,7 @@ class TimeEntry {
       clockOut: map['clock_out'] == null
           ? null
           : DateTime.tryParse(map['clock_out'].toString()),
+      clockInPhotoPath: map['clock_in_photo_path']?.toString(),
     );
   }
 }

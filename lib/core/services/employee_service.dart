@@ -13,7 +13,8 @@ class EmployeeService {
   ) async {
     final response = await _client
         .from('company_members')
-        .select('user_id, role, hourly_rate, profiles(email, full_name)')
+        .select(
+            'user_id, role, hourly_rate, hire_date, profiles(email, full_name)')
         .eq('company_id', companyId);
 
     final List data = response as List;
@@ -28,6 +29,9 @@ class EmployeeService {
         role: (row['role'] ?? 'employee').toString(),
         companyId: companyId,
         hourlyRate: (row['hourly_rate'] ?? 20).toDouble(),
+        hireDate: row['hire_date'] == null
+            ? null
+            : DateTime.tryParse(row['hire_date'].toString()),
       );
     }).toList();
   }
@@ -38,7 +42,8 @@ class EmployeeService {
   ) async {
     final response = await _client
         .from('company_members')
-        .select('user_id, role, hourly_rate, profiles(email, full_name)')
+        .select(
+            'user_id, role, hourly_rate, hire_date, profiles(email, full_name)')
         .eq('company_id', companyId)
         .eq('user_id', userId)
         .maybeSingle();
@@ -54,7 +59,25 @@ class EmployeeService {
       role: (response['role'] ?? 'employee').toString(),
       companyId: companyId,
       hourlyRate: (response['hourly_rate'] ?? 20).toDouble(),
+      hireDate: response['hire_date'] == null
+          ? null
+          : DateTime.tryParse(response['hire_date'].toString()),
     );
+  }
+
+  /// Manager-only in practice. Sets the employee's actual hire date
+  /// at this company — the seniority signal used when a company
+  /// enables seniority-first open-shift claiming.
+  static Future<void> updateHireDate({
+    required String companyId,
+    required String userId,
+    required DateTime hireDate,
+  }) async {
+    await _client
+        .from('company_members')
+        .update({'hire_date': hireDate.toIso8601String().split('T').first})
+        .eq('company_id', companyId)
+        .eq('user_id', userId);
   }
 
   /// Manager-only in practice. NOTE: this assumes company_members'

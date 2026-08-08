@@ -11,6 +11,7 @@ import 'package:flutter/material.dart';
 import '../../core/services/session_service.dart';
 import '../../core/services/employee_service.dart';
 import '../../core/services/time_entry_service.dart';
+import '../../core/services/clock_in_photo_service.dart';
 import '../../shared/models/employee_profile.dart';
 import '../../shared/models/time_entry_model.dart';
 
@@ -74,6 +75,24 @@ class _TimeEntriesScreenState extends State<TimeEntriesScreen> {
     return "${d.month}/${d.day} $h:${d.minute.toString().padLeft(2, '0')} $period";
   }
 
+  Future<void> _viewPhoto(String path) async {
+    try {
+      final url = await ClockInPhotoService.getSignedUrl(path);
+      if (!mounted) return;
+      showDialog(
+        context: context,
+        builder: (_) => Dialog(
+          child: Image.network(url, fit: BoxFit.contain),
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("Couldn't load photo: \$e"), backgroundColor: Colors.red),
+      );
+    }
+  }
+
   Future<void> _openEntry(TimeEntry entry) async {
     final changed = await showModalBottomSheet<bool>(
       context: context,
@@ -122,7 +141,18 @@ class _TimeEntriesScreenState extends State<TimeEntriesScreen> {
                           subtitle: Text(
                             "In: ${_fmt(e.clockIn)}  •  Out: ${_fmt(e.clockOut)}",
                           ),
-                          trailing: const Icon(Icons.chevron_right),
+                          trailing: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              if (e.hasPhoto)
+                                IconButton(
+                                  icon: const Icon(Icons.photo_camera_outlined, size: 20),
+                                  tooltip: "View clock-in photo",
+                                  onPressed: () => _viewPhoto(e.clockInPhotoPath!),
+                                ),
+                              const Icon(Icons.chevron_right),
+                            ],
+                          ),
                         ),
                       );
                     },
