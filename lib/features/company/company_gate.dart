@@ -32,31 +32,36 @@ class _CompanyGateState extends State<CompanyGate> {
   }
 
   Future<void> boot() async {
-    final user = Supabase.instance.client.auth.currentUser;
+    try {
+      final user = Supabase.instance.client.auth.currentUser;
 
-    if (user == null) {
+      if (user == null) {
+        setState(() => loading = false);
+        return;
+      }
+
+      await SessionService.restoreSession();
+
+      final userId = user.id;
+
+      final companyId = SessionService.activeCompanyId;
+
+      if (companyId == null) {
+        await loadInvites(user.email ?? '');
+        setState(() => loading = false);
+        return;
+      }
+
+      await RoleService.syncRole(
+        companyId: companyId,
+        userId: userId,
+      );
+
       setState(() => loading = false);
-      return;
-    }
-
-    await SessionService.restoreSession();
-
-    final userId = user.id;
-
-    final companyId = SessionService.activeCompanyId;
-
-    if (companyId == null) {
-      await loadInvites(user.email ?? '');
+    } catch (e) {
+      debugPrint('CompanyGate boot skipped: $e');
       setState(() => loading = false);
-      return;
     }
-
-    await RoleService.syncRole(
-      companyId: companyId,
-      userId: userId,
-    );
-
-    setState(() => loading = false);
   }
 
   Future<void> loadInvites(String email) async {
@@ -128,7 +133,13 @@ class _CompanyGateState extends State<CompanyGate> {
       );
     }
 
-    final user = Supabase.instance.client.auth.currentUser;
+    User? user;
+    try {
+      user = Supabase.instance.client.auth.currentUser;
+    } catch (e) {
+      debugPrint('CompanyGate build: Supabase not initialized — $e');
+      user = null;
+    }
 
     // ----------------------------
     // NOT AUTHENTICATED — previously a dead end with no way back

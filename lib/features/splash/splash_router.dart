@@ -3,6 +3,7 @@
 import 'package:flutter/material.dart';
 
 import '../../core/services/session_service.dart';
+import '../../core/services/push_notification_service.dart';
 import '../time_clock/home_screen.dart';
 import '../company/company_gate.dart';
 
@@ -23,7 +24,12 @@ class _SplashRouterState extends State<SplashRouter> {
   }
 
   Future<void> _boot() async {
-    await SessionService.restoreSession();
+    // Restore session and register for push notifications in the background.
+    // Neither must block app boot — the splash screen must transition
+    // immediately so the app feels responsive.
+    SessionService.restoreSession();
+    PushNotificationService.init();
+    PushNotificationService.handleInitialMessage();
 
     if (!mounted) return;
 
