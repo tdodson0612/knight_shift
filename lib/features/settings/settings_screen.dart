@@ -499,13 +499,16 @@ class _SettingsScreenState extends State<SettingsScreen> {
               style: TextStyle(fontWeight: FontWeight.w600),
             ),
             const SizedBox(height: 4),
+            // ignore: deprecated_member_use
             RadioListTile<String>(
               contentPadding: EdgeInsets.zero,
               dense: true,
               title:
                   const Text("Track hours only (pay stays at straight rate)"),
               value: 'hours_only',
+              // ignore: deprecated_member_use
               groupValue: s.payMode,
+              // ignore: deprecated_member_use
               onChanged: (v) =>
                   setState(() => overtimeSettings = s.copyWith(payMode: v)),
             ),
@@ -514,7 +517,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
               dense: true,
               title: const Text("Calculate overtime pay automatically"),
               value: 'calculate_pay',
+              // ignore: deprecated_member_use
               groupValue: s.payMode,
+              // ignore: deprecated_member_use
               onChanged: (v) =>
                   setState(() => overtimeSettings = s.copyWith(payMode: v)),
             ),
@@ -626,25 +631,29 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 "Scoring",
                 style: TextStyle(fontWeight: FontWeight.w600),
               ),
-              const SizedBox(height: 4),
-              RadioListTile<String>(
-                contentPadding: EdgeInsets.zero,
-                dense: true,
-                title: const Text("Same point cost for any infraction"),
-                value: 'flat',
-                groupValue: s.weightMode,
-                onChanged: (v) => setState(
-                    () => reliabilitySettings = s.copyWith(weightMode: v)),
-              ),
-              RadioListTile<String>(
-                contentPadding: EdgeInsets.zero,
-                dense: true,
-                title: const Text("Different point cost per infraction type"),
-                value: 'weighted',
-                groupValue: s.weightMode,
-                onChanged: (v) => setState(
-                    () => reliabilitySettings = s.copyWith(weightMode: v)),
-              ),
+               const SizedBox(height: 4),
+                RadioListTile<String>(
+                  contentPadding: EdgeInsets.zero,
+                  dense: true,
+                  title: const Text("Same point cost for any infraction"),
+                  value: 'flat',
+                  // ignore: deprecated_member_use
+                  groupValue: s.weightMode,
+                  // ignore: deprecated_member_use
+                  onChanged: (v) => setState(
+                      () => reliabilitySettings = s.copyWith(weightMode: v)),
+                ),
+                RadioListTile<String>(
+                  contentPadding: EdgeInsets.zero,
+                  dense: true,
+                  title: const Text("Different point cost per infraction type"),
+                  value: 'weighted',
+                  // ignore: deprecated_member_use
+                  groupValue: s.weightMode,
+                  // ignore: deprecated_member_use
+                  onChanged: (v) => setState(
+                      () => reliabilitySettings = s.copyWith(weightMode: v)),
+                ),
 
               const SizedBox(height: 8),
               if (!s.isWeighted)

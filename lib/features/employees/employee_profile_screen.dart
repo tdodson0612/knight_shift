@@ -10,6 +10,8 @@ import '../../core/services/session_service.dart';
 import '../../core/services/shift_service.dart';
 import '../../core/services/reliability_service.dart';
 import '../../core/services/employee_service.dart';
+import '../../core/services/employee_skill_service.dart';
+import '../../shared/models/employee_skill_model.dart';
 
 const List<String> _dayNames = [
   "Monday",
@@ -45,16 +47,27 @@ class _EmployeeProfileScreenState extends State<EmployeeProfileScreen> {
   late double currentRate;
   bool savingRate = false;
 
+  DateTime? currentHireDate;
+  bool savingHireDate = false;
+
   bool loadingReliability = true;
   ReliabilitySettings? reliabilitySettings;
   ReliabilityStats? reliabilityStats;
+
+  // Skills state.
+  bool loadingSkills = true;
+  List<EmployeeSkill> allSkills = [];
+  Set<String> assignedSkillIds = {};
+  bool savingSkills = false;
 
   @override
   void initState() {
     super.initState();
     currentRate = widget.employee.hourlyRate;
+    currentHireDate = widget.employee.hireDate;
     _loadAvailability();
     _loadReliability();
+    _loadSkills();
   }
 
   Future<void> _loadAvailability() async {
@@ -74,6 +87,76 @@ class _EmployeeProfileScreenState extends State<EmployeeProfileScreen> {
     }
 
     if (mounted) setState(() => loadingAvailability = false);
+  }
+
+  Future<void> _loadSkills() async {
+    final companyId = SessionService.activeCompanyId;
+    if (companyId == null) {
+      setState(() => loadingSkills = false);
+      return;
+    }
+
+    try {
+      final results = await Future.wait([
+        EmployeeSkillService.getSkills(companyId),
+        EmployeeSkillService.getAssignmentsForUser(
+          companyId: companyId,
+          userId: widget.employee.userId,
+        ),
+      ]);
+
+      allSkills = results[0] as List<EmployeeSkill>;
+      final assignments = results[1] as List<EmployeeSkillAssignment>;
+      assignedSkillIds = assignments.map((a) => a.skillId).toSet();
+    } catch (_) {
+      allSkills = [];
+      assignedSkillIds = {};
+    }
+
+    if (mounted) setState(() => loadingSkills = false);
+  }
+
+  Future<void> _toggleSkill(EmployeeSkill skill, bool assign) async {
+    final companyId = SessionService.activeCompanyId;
+    if (companyId == null) return;
+
+    setState(() {
+      if (assign) {
+        assignedSkillIds.add(skill.id);
+      } else {
+        assignedSkillIds.remove(skill.id);
+      }
+    });
+
+    try {
+      if (assign) {
+        await EmployeeSkillService.assignSkill(
+          companyId: companyId,
+          userId: widget.employee.userId,
+          skillId: skill.id,
+        );
+      } else {
+        await EmployeeSkillService.unassignSkill(
+          companyId: companyId,
+          userId: widget.employee.userId,
+          skillId: skill.id,
+        );
+      }
+    } catch (e) {
+      // Revert on failure so UI matches what's actually saved.
+      setState(() {
+        if (assign) {
+          assignedSkillIds.remove(skill.id);
+        } else {
+          assignedSkillIds.add(skill.id);
+        }
+      });
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text("$e"), backgroundColor: Colors.red),
+        );
+      }
+    }
   }
 
   Future<void> _loadReliability() async {
@@ -116,6 +199,40 @@ class _EmployeeProfileScreenState extends State<EmployeeProfileScreen> {
     }
 
     if (mounted) setState(() => loadingReliability = false);
+  }
+
+  Future<void> _editHireDate() async {
+    final initial = currentHireDate ?? DateTime.now();
+
+    final result = await showDatePicker(
+      context: context,
+      initialDate: initial,
+      firstDate: DateTime(2000),
+      lastDate: DateTime.now(),
+      helpText: "Select Hire Date",
+    );
+
+    if (result == null) return;
+
+    setState(() => savingHireDate = true);
+
+    try {
+      await EmployeeService.updateHireDate(
+        companyId: widget.employee.companyId,
+        userId: widget.employee.userId,
+        hireDate: result,
+      );
+
+      if (!mounted) return;
+      setState(() => currentHireDate = result);
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("Couldn't save hire date: $e"), backgroundColor: Colors.red),
+      );
+    } finally {
+      if (mounted) setState(() => savingHireDate = false);
+    }
   }
 
   Future<void> _editRate() async {
@@ -174,6 +291,10 @@ class _EmployeeProfileScreenState extends State<EmployeeProfileScreen> {
     }
   }
 
+  String _formatDate(DateTime d) {
+    return "${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}";
+  }
+
   String _formatTime(TimeOfDay t) {
     final hour = t.hourOfPeriod == 0 ? 12 : t.hourOfPeriod;
     final minute = t.minute.toString().padLeft(2, '0');
@@ -212,6 +333,24 @@ class _EmployeeProfileScreenState extends State<EmployeeProfileScreen> {
               ),
             ],
           ),
+          const SizedBox(height: 4),
+          Row(
+            children: [
+              Text(
+                currentHireDate == null
+                    ? "Hire Date: Not set"
+                    : "Hire Date: ${_formatDate(currentHireDate!)}",
+              ),
+              const SizedBox(width: 8),
+              InkWell(
+                onTap: savingHireDate ? null : _editHireDate,
+                child: Icon(Icons.edit, size: 16, color: Colors.grey[600]),
+              ),
+            ],
+          ),
+
+          const SizedBox(height: 24),
+          _skillsSection(),
 
           const SizedBox(height: 24),
           _reliabilitySection(),
@@ -240,6 +379,37 @@ class _EmployeeProfileScreenState extends State<EmployeeProfileScreen> {
             for (int day = 1; day <= 7; day++) _availabilityRow(day),
         ],
       ),
+    );
+  }
+
+  Widget _skillsSection() {
+    if (loadingSkills) {
+      return const Padding(
+        padding: EdgeInsets.symmetric(vertical: 16),
+        child: Center(child: CircularProgressIndicator()),
+      );
+    }
+
+    if (allSkills.isEmpty) {
+      return const SizedBox.shrink();
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          "Skills",
+          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+        ),
+        const Divider(),
+        ...allSkills.map((skill) => CheckboxListTile(
+              contentPadding: EdgeInsets.zero,
+              dense: true,
+              title: Text(skill.label, style: const TextStyle(fontSize: 13)),
+              value: assignedSkillIds.contains(skill.id),
+              onChanged: (v) => _toggleSkill(skill, v ?? false),
+            )),
+      ],
     );
   }
 

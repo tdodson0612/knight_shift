@@ -5,9 +5,13 @@ import 'package:flutter/material.dart';
 import '../../core/services/session_service.dart';
 import '../../core/services/shift_service.dart';
 import '../../core/services/employee_service.dart';
+import '../../core/services/labor_budget_service.dart';
+import '../../core/services/overtime_service.dart';
 
 import '../../shared/models/shift_model.dart';
 import '../../shared/models/employee_profile.dart';
+import '../scheduling/shift_detail_sheet.dart';
+import 'recurring_shift_screen.dart';
 
 class ManagerSchedulingScreen extends StatefulWidget {
   const ManagerSchedulingScreen({super.key});
@@ -66,6 +70,19 @@ class _ManagerSchedulingScreenState extends State<ManagerSchedulingScreen> {
         title: const Text("Weekly Schedule"),
         actions: [
           IconButton(
+            icon: const Icon(Icons.repeat),
+            tooltip: "Recurring Shifts",
+            onPressed: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const RecurringShiftScreen()),
+            ),
+          ),
+          IconButton(
+            icon: const Icon(Icons.content_copy),
+            tooltip: "Copy This Week to Next Week",
+            onPressed: _copyWeek,
+          ),
+          IconButton(
             icon: const Icon(Icons.refresh),
             onPressed: load,
           ),
@@ -81,7 +98,8 @@ class _ManagerSchedulingScreenState extends State<ManagerSchedulingScreen> {
                   color: Colors.teal.shade50,
                   child: const Text(
                     "Tap an empty slot to schedule yourself • "
-                    "Long-press to post an open shift",
+                    "Long-press to post an open shift • "
+                    "Long-press an existing shift for comments/checklist",
                     style: TextStyle(fontSize: 11, color: Colors.teal),
                     textAlign: TextAlign.center,
                   ),
@@ -226,9 +244,11 @@ class _ManagerSchedulingScreenState extends State<ManagerSchedulingScreen> {
       top: top,
       left: 4,
       right: 4,
-      child: onTap != null
-          ? GestureDetector(onTap: onTap, child: block)
-          : block,
+      child: GestureDetector(
+        onTap: onTap,
+        onLongPress: () => showShiftDetailSheet(context, s),
+        child: block,
+      ),
     );
   }
 
@@ -449,6 +469,97 @@ class _ManagerSchedulingScreenState extends State<ManagerSchedulingScreen> {
   }
 
   // ----------------------------
+  // COPY THIS WEEK TO NEXT WEEK (schedule templates)
+  // ----------------------------
+  Future<void> _copyWeek() async {
+    if (creating) return;
+
+    final companyId = SessionService.activeCompanyId;
+    final managerId = SessionService.activeUserId;
+    if (companyId == null || managerId == null) return;
+
+    final now = DateTime.now();
+
+    // Source = this week (Monday through Sunday).
+    final sourceStart = DateTime(now.year, now.month, now.day)
+        .subtract(Duration(days: now.weekday - DateTime.monday));
+    final sourceEnd = sourceStart.add(const Duration(days: 7));
+
+    // Target = next week.
+    final targetStart = sourceStart.add(const Duration(days: 7));
+    final targetEnd = sourceEnd.add(const Duration(days: 7));
+
+    final sourceCount = shifts.where((s) {
+      return (s.startTime.isAfter(sourceStart) ||
+              s.startTime.isAtSameMomentAs(sourceStart)) &&
+          (s.startTime.isBefore(sourceEnd) ||
+              s.startTime.isAtSameMomentAs(sourceEnd));
+    }).length;
+
+    if (sourceCount == 0) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text("No shifts in the current week to copy"),
+          backgroundColor: Colors.orange,
+        ),
+      );
+      return;
+    }
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text("Copy This Week?"),
+        content: Text(
+          "Copy $sourceCount shift${sourceCount == 1 ? '' : 's'} from the "
+          "current week to next week? Each shift is copied as a fresh "
+          "manager-approved schedule entry — conflicts are skipped.",
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text("Cancel"),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: const Text("Copy"),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true) return;
+
+    setState(() => creating = true);
+
+    try {
+      final copied = await ShiftService.copyShifts(
+        companyId: companyId,
+        createdBy: managerId,
+        sourceStart: sourceStart,
+        sourceEnd: sourceEnd,
+        targetStart: targetStart,
+        targetEnd: targetEnd,
+      );
+
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("Copied $copied shift${copied == 1 ? '' : 's'} to next week")),
+      );
+
+      await load();
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("$e"), backgroundColor: Colors.red),
+      );
+    } finally {
+      if (mounted) setState(() => creating = false);
+    }
+  }
+
+  // ----------------------------
   // CREATE (manager scheduling = official, auto-approved, for self)
   // ----------------------------
   Future<void> _create(int day, int hour) async {
@@ -492,13 +603,69 @@ class _ManagerSchedulingScreenState extends State<ManagerSchedulingScreen> {
         return;
       }
 
+      // Collect advisory warnings in one pass: the standard
+      // availability/time-off warning from analyzeShift, plus the
+      // new live overtime-risk and labor-budget projections. All are
+      // non-blocking — the manager can always proceed.
+      final advisoryWarnings = <String>[];
+
       if (analysis.warning != null) {
+        advisoryWarnings.add(analysis.warning!);
+      }
+
+      try {
+        final overtimeSettings = await OvertimeService.getSettings(companyId);
+        final projectedHours = LaborBudgetService.projectedWeeklyHours(
+          shifts: shifts,
+          newStart: start,
+          newEnd: end,
+          userId: userId,
+        );
+        if (LaborBudgetService.crossesOvertimeThreshold(
+          projectedHours: projectedHours,
+          overtime: overtimeSettings,
+        )) {
+          advisoryWarnings.add(
+            "Projected ${projectedHours.toStringAsFixed(1)} hrs this week — "
+            "crosses the ${overtimeSettings.weeklyThresholdHours.toStringAsFixed(0)}-hr "
+            "overtime threshold",
+          );
+        }
+      } catch (_) {
+        // Projection failed — fail open, don't block scheduling.
+      }
+
+      try {
+        final budgetSettings =
+            await LaborBudgetService.getSettings(companyId);
+        final projectedCost = await LaborBudgetService
+            .projectedWeeklyLaborCost(
+          companyId: companyId,
+          shifts: shifts,
+          newStart: start,
+          newEnd: end,
+          userId: userId,
+        );
+        if (LaborBudgetService.exceedsBudget(
+          projectedCost: projectedCost,
+          budget: budgetSettings,
+        )) {
+          advisoryWarnings.add(
+            "Projected weekly labor: \$${projectedCost.toStringAsFixed(2)} "
+            "(budget \$${budgetSettings.amount.toStringAsFixed(2)})",
+          );
+        }
+      } catch (_) {
+        // Projection failed — fail open, don't block scheduling.
+      }
+
+      if (advisoryWarnings.isNotEmpty) {
         if (!mounted) return;
         final proceed = await showDialog<bool>(
           context: context,
           builder: (dialogContext) => AlertDialog(
             title: const Text("Heads up"),
-            content: Text(analysis.warning!),
+            content: Text(advisoryWarnings.join("\n\n")),
             actions: [
               TextButton(
                 onPressed: () => Navigator.pop(dialogContext, false),
