@@ -101,8 +101,14 @@ plist edit alone.
 
 ## Deploy the Edge Function
 
+Deploy with **`--no-verify-jwt`** — this function is called by the
+database trigger (via `pg_net`), not by an end-user client, so
+Supabase's normal user-JWT check must be disabled. Authorization is
+instead verified by the shared service-role key sent in the
+`Authorization` header by the trigger.
+
 ```bash
-supabase functions deploy send-push-notification
+supabase functions deploy send-push-notification --no-verify-jwt
 ```
 
 Set the secret (if not already via dashboard):

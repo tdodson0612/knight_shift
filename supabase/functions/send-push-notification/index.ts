@@ -11,6 +11,12 @@
 //   3. (iOS) An APNs key uploaded to Firebase, and the app built
 //      with push capability (paid Apple Developer account).
 //
+// Deploy with --no-verify-jwt: this function is called by the
+// database trigger (via pg_net), not by an end-user client, so
+// Supabase's normal user-JWT check must be disabled. Authorization
+// is instead verified by the shared service-role key sent in the
+// Authorization header by the trigger.
+//
 // This function reads the recipient's device tokens from
 // `user_device_tokens` (service-role bypasses RLS) and sends one
 // FCM message per token. It is idempotent and fails open — a push
@@ -24,12 +30,6 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type",
 };
 
-const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
-const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-const firebaseServiceAccountB64 = Deno.env.get("FIREBASE_SERVICE_ACCOUNT");
-
-const supabase = createClient(supabaseUrl, serviceRoleKey);
-
 interface NotificationRow {
   id: string;
   user_id: string;
@@ -42,12 +42,21 @@ Deno.serve(async (req) => {
     return new Response("ok", { headers: corsHeaders });
   }
 
-  // Only the DB trigger (via service role) should call this.
+  // Deployed with --no-verify-jwt because the caller is the DB
+  // trigger, not an end-user client. Authorization is verified
+  // below by the shared service-role key.
   const auth = req.headers.get("Authorization") ?? "";
-  if (auth !== `Bearer ${serviceRoleKey}`) {
+  const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+  if (!serviceRoleKey || auth !== `Bearer ${serviceRoleKey}`) {
     return new Response("Unauthorized", { status: 401 });
   }
 
+  const supabaseUrl = Deno.env.get("SUPABASE_URL");
+  if (!supabaseUrl) {
+    return new Response("Server misconfigured: missing SUPABASE_URL", { status: 500 });
+  }
+
+  const firebaseServiceAccountB64 = Deno.env.get("FIREBASE_SERVICE_ACCOUNT");
   if (!firebaseServiceAccountB64) {
     console.error("FIREBASE_SERVICE_ACCOUNT secret not configured — skipping push.");
     return new Response("FIREBASE_SERVICE_ACCOUNT not configured", { status: 200 });
@@ -63,6 +72,8 @@ Deno.serve(async (req) => {
   if (!payload.id || !payload.user_id) {
     return new Response("Missing notification_id or user_id", { status: 400 });
   }
+
+  const supabase = createClient(supabaseUrl, serviceRoleKey);
 
   // Fetch the recipient's device tokens.
   const { data: tokens, error: tokenError } = await supabase
@@ -94,7 +105,7 @@ Deno.serve(async (req) => {
   };
 
   // Send one message per token. FCM v1 API.
-  const accessToken = await getAccessToken();
+  const accessToken = await getAccessToken(firebaseServiceAccountB64);
   if (!accessToken) {
     console.error("Could not obtain FCM access token.");
     return new Response("FCM auth error", { status: 500 });
@@ -110,7 +121,7 @@ Deno.serve(async (req) => {
     };
 
     const res = await fetch(
-      "https://fcm.googleapis.com/v1/projects/" + projectId() + "/messages:send",
+      "https://fcm.googleapis.com/v1/projects/" + projectId(firebaseServiceAccountB64) + "/messages:send",
       {
         method: "POST",
         headers: {
@@ -126,7 +137,7 @@ Deno.serve(async (req) => {
     } else {
       failed++;
       const body = await res.text();
-      console.error(`FCM send failed for token ${t.token}: ${res.status} ${body}`);
+      console.error(`FCM send failed: ${res.status} ${body}`);
     }
   }
 
@@ -140,12 +151,12 @@ Deno.serve(async (req) => {
 
 let cachedToken: { value: string; expiresAt: number } | null = null;
 
-async function getAccessToken(): Promise<string | null> {
+async function getAccessToken(firebaseServiceAccountB64: string): Promise<string | null> {
   if (cachedToken && cachedToken.expiresAt > Date.now() + 60_000) {
     return cachedToken.value;
   }
 
-  const sa = JSON.parse(atob(firebaseServiceAccountB64!));
+  const sa = JSON.parse(atob(firebaseServiceAccountB64));
   const now = Math.floor(Date.now() / 1000);
   const header = { alg: "RS256", typ: "JWT" };
   const claims = {
@@ -189,8 +200,8 @@ async function getAccessToken(): Promise<string | null> {
   return data.access_token;
 }
 
-function projectId(): string {
-  const sa = JSON.parse(atob(firebaseServiceAccountB64!));
+function projectId(firebaseServiceAccountB64: string): string {
+  const sa = JSON.parse(atob(firebaseServiceAccountB64));
   return sa.project_id;
 }
 
