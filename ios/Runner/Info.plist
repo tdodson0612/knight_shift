@@ -5,7 +5,7 @@
         <key>CFBundleDevelopmentRegion</key>
         <string>$(DEVELOPMENT_LANGUAGE)</string>
         <key>CFBundleDisplayName</key>
-	<string>Knight Shift</string>
+        <string>Knight Shift</string>
         <key>CFBundleExecutable</key>
         <string>$(EXECUTABLE_NAME)</string>
         <key>CFBundleIdentifier</key>
@@ -13,7 +13,7 @@
         <key>CFBundleInfoDictionaryVersion</key>
         <string>6.0</string>
         <key>CFBundleName</key>
-	<string>Knight Shift</string>
+        <string>knight_shift</string>
         <key>CFBundlePackageType</key>
         <string>APPL</string>
         <key>CFBundleShortVersionString</key>
@@ -40,6 +40,10 @@
              actually has geofencing enabled and turns on location. -->
         <key>NSLocationWhenInUseUsageDescription</key>
         <string>Knight Shift can optionally require you to be near your job site to clock in, if your employer has that turned on.</string>
+        <!-- Photo-on-clock-in — only requested when a company
+             actually has this turned on. -->
+        <key>NSCameraUsageDescription</key>
+        <string>Knight Shift can optionally require a quick photo when you clock in, if your employer has that turned on.</string>
         <key>LSRequiresIPhoneOS</key>
         <true/>
         <key>UILaunchStoryboardName</key>

@@ -2,8 +2,10 @@
     <!-- Geofenced clock-in — only used when a company has it enabled. -->
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION"/>
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION"/>
+    <!-- Photo-on-clock-in — only used when a company has it enabled. -->
+    <uses-permission android:name="android.permission.CAMERA"/>
     <application
-        android:label="Knight Shift"
+        android:label="knight_shift"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
         <activity

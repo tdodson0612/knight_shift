@@ -20,6 +20,8 @@ dependencies:
   file_picker: ^11.0.3
   geolocator: ^14.0.2
   app_links: ^6.4.1
+  image_picker: ^1.2.2
+  firebase_messaging: ^16.5.0
 
 dev_dependencies:
   flutter_test:

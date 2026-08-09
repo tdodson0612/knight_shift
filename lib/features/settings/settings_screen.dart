@@ -12,6 +12,10 @@ import '../../core/services/incident_report_service.dart';
 import '../../core/services/geofence_service.dart';
 import '../../shared/models/geofence_settings_model.dart';
 import 'package:geolocator/geolocator.dart';
+import '../../core/services/shift_comment_service.dart';
+import '../../core/services/shift_checklist_service.dart';
+import '../../core/services/clock_in_photo_service.dart';
+import '../../shared/models/shift_checklist_model.dart';
 import '../legal/legal_reference_screen.dart';
 import '../../shared/models/employee_profile.dart';
 import '../../shared/models/overtime_settings_model.dart';
@@ -61,6 +65,16 @@ class _SettingsScreenState extends State<SettingsScreen> {
   bool locatingNow = false;
   late final TextEditingController _radiusController;
 
+  // Manager-only shift comments / checklist state.
+  bool? shiftCommentsEnabled;
+  bool? shiftChecklistsEnabled;
+  List<ShiftChecklistItem> checklistItems = [];
+  late final TextEditingController _newChecklistItemController;
+  bool savingShiftExtras = false;
+
+  // Manager-only photo-at-clock-in state.
+  bool? clockInPhotoEnabled;
+
   @override
   void initState() {
     super.initState();
@@ -73,6 +87,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     _weightEarlyController = TextEditingController();
     _weightNoShowController = TextEditingController();
     _radiusController = TextEditingController();
+    _newChecklistItemController = TextEditingController();
     _load();
   }
 
@@ -87,6 +102,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     _weightEarlyController.dispose();
     _weightNoShowController.dispose();
     _radiusController.dispose();
+    _newChecklistItemController.dispose();
     super.dispose();
   }
 
@@ -132,6 +148,21 @@ class _SettingsScreenState extends State<SettingsScreen> {
         _radiusController.text = geofenceSettings!.radiusMeters.toStringAsFixed(0);
       } catch (_) {
         geofenceSettings = null;
+      }
+
+      try {
+        shiftCommentsEnabled = await ShiftCommentService.isEnabled(companyId);
+        shiftChecklistsEnabled = await ShiftChecklistService.isEnabled(companyId);
+        checklistItems = await ShiftChecklistService.getItems(companyId);
+      } catch (_) {
+        shiftCommentsEnabled = null;
+        shiftChecklistsEnabled = null;
+      }
+
+      try {
+        clockInPhotoEnabled = await ClockInPhotoService.isRequired(companyId);
+      } catch (_) {
+        clockInPhotoEnabled = null;
       }
     }
 
@@ -352,6 +383,73 @@ class _SettingsScreenState extends State<SettingsScreen> {
     }
   }
 
+  Future<void> _toggleShiftComments(bool v) async {
+    final companyId = SessionService.activeCompanyId;
+    if (companyId == null) return;
+    setState(() => shiftCommentsEnabled = v);
+    try {
+      await ShiftCommentService.setEnabled(companyId, v);
+    } catch (e) {
+      _error("Couldn't save: \$e");
+    }
+  }
+
+  Future<void> _toggleShiftChecklists(bool v) async {
+    final companyId = SessionService.activeCompanyId;
+    if (companyId == null) return;
+    setState(() => shiftChecklistsEnabled = v);
+    try {
+      await ShiftChecklistService.setEnabled(companyId, v);
+    } catch (e) {
+      _error("Couldn't save: \$e");
+    }
+  }
+
+  Future<void> _addChecklistItem() async {
+    final companyId = SessionService.activeCompanyId;
+    final label = _newChecklistItemController.text.trim();
+    if (companyId == null || label.isEmpty) return;
+
+    setState(() => savingShiftExtras = true);
+    try {
+      await ShiftChecklistService.addItem(
+        companyId: companyId,
+        label: label,
+        sortOrder: checklistItems.length,
+      );
+      _newChecklistItemController.clear();
+      checklistItems = await ShiftChecklistService.getItems(companyId);
+    } catch (e) {
+      _error("Couldn't add item: \$e");
+    } finally {
+      if (mounted) setState(() => savingShiftExtras = false);
+    }
+  }
+
+  Future<void> _deleteChecklistItem(ShiftChecklistItem item) async {
+    final companyId = SessionService.activeCompanyId;
+    if (companyId == null) return;
+
+    try {
+      await ShiftChecklistService.deleteItem(item.id);
+      checklistItems = await ShiftChecklistService.getItems(companyId);
+      if (mounted) setState(() {});
+    } catch (e) {
+      _error("Couldn't remove item: \$e");
+    }
+  }
+
+  Future<void> _toggleClockInPhoto(bool v) async {
+    final companyId = SessionService.activeCompanyId;
+    if (companyId == null) return;
+    setState(() => clockInPhotoEnabled = v);
+    try {
+      await ClockInPhotoService.setRequired(companyId, v);
+    } catch (e) {
+      _error("Couldn't save: \$e");
+    }
+  }
+
   void _error(String message) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text(message), backgroundColor: Colors.red),
@@ -420,6 +518,16 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 if (isManager && geofenceSettings != null) ...[
                   const SizedBox(height: 24),
                   _geofenceSection(),
+                ],
+
+                if (isManager && shiftCommentsEnabled != null) ...[
+                  const SizedBox(height: 24),
+                  _shiftExtrasSection(),
+                ],
+
+                if (isManager && clockInPhotoEnabled != null) ...[
+                  const SizedBox(height: 24),
+                  _clockInPhotoSection(),
                 ],
 
                 const SizedBox(height: 24),
@@ -499,29 +607,30 @@ class _SettingsScreenState extends State<SettingsScreen> {
               style: TextStyle(fontWeight: FontWeight.w600),
             ),
             const SizedBox(height: 4),
-            // ignore: deprecated_member_use
-            RadioListTile<String>(
-              contentPadding: EdgeInsets.zero,
-              dense: true,
-              title:
-                  const Text("Track hours only (pay stays at straight rate)"),
-              value: 'hours_only',
-              // ignore: deprecated_member_use
+            RadioGroup<String>(
               groupValue: s.payMode,
-              // ignore: deprecated_member_use
-              onChanged: (v) =>
-                  setState(() => overtimeSettings = s.copyWith(payMode: v)),
-            ),
-            RadioListTile<String>(
-              contentPadding: EdgeInsets.zero,
-              dense: true,
-              title: const Text("Calculate overtime pay automatically"),
-              value: 'calculate_pay',
-              // ignore: deprecated_member_use
-              groupValue: s.payMode,
-              // ignore: deprecated_member_use
-              onChanged: (v) =>
-                  setState(() => overtimeSettings = s.copyWith(payMode: v)),
+              onChanged: (v) {
+                if (v != null) {
+                  setState(() => overtimeSettings = s.copyWith(payMode: v));
+                }
+              },
+              child: Column(
+                children: [
+                  RadioListTile<String>(
+                    contentPadding: EdgeInsets.zero,
+                    dense: true,
+                    title: const Text(
+                        "Track hours only (pay stays at straight rate)"),
+                    value: 'hours_only',
+                  ),
+                  RadioListTile<String>(
+                    contentPadding: EdgeInsets.zero,
+                    dense: true,
+                    title: const Text("Calculate overtime pay automatically"),
+                    value: 'calculate_pay',
+                  ),
+                ],
+              ),
             ),
 
             if (s.calculatesPay) ...[
@@ -631,29 +740,33 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 "Scoring",
                 style: TextStyle(fontWeight: FontWeight.w600),
               ),
-               const SizedBox(height: 4),
-                RadioListTile<String>(
-                  contentPadding: EdgeInsets.zero,
-                  dense: true,
-                  title: const Text("Same point cost for any infraction"),
-                  value: 'flat',
-                  // ignore: deprecated_member_use
-                  groupValue: s.weightMode,
-                  // ignore: deprecated_member_use
-                  onChanged: (v) => setState(
-                      () => reliabilitySettings = s.copyWith(weightMode: v)),
+              const SizedBox(height: 4),
+              RadioGroup<String>(
+                groupValue: s.weightMode,
+                onChanged: (v) {
+                  if (v != null) {
+                    setState(
+                        () => reliabilitySettings = s.copyWith(weightMode: v));
+                  }
+                },
+                child: Column(
+                  children: [
+                    RadioListTile<String>(
+                      contentPadding: EdgeInsets.zero,
+                      dense: true,
+                      title: const Text("Same point cost for any infraction"),
+                      value: 'flat',
+                    ),
+                    RadioListTile<String>(
+                      contentPadding: EdgeInsets.zero,
+                      dense: true,
+                      title:
+                          const Text("Different point cost per infraction type"),
+                      value: 'weighted',
+                    ),
+                  ],
                 ),
-                RadioListTile<String>(
-                  contentPadding: EdgeInsets.zero,
-                  dense: true,
-                  title: const Text("Different point cost per infraction type"),
-                  value: 'weighted',
-                  // ignore: deprecated_member_use
-                  groupValue: s.weightMode,
-                  // ignore: deprecated_member_use
-                  onChanged: (v) => setState(
-                      () => reliabilitySettings = s.copyWith(weightMode: v)),
-                ),
+              ),
 
               const SizedBox(height: 8),
               if (!s.isWeighted)
@@ -824,6 +937,102 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 onPressed: savingGeofence ? null : _saveGeofenceSettings,
                 child: Text(savingGeofence ? "Saving..." : "Save Geofence Settings"),
               ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _shiftExtrasSection() {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              "Shift Comments & Checklists",
+              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+            ),
+            const SizedBox(height: 4),
+            const Text(
+              "Both off by default. Available by long-pressing any shift.",
+              style: TextStyle(fontSize: 12, color: Colors.grey),
+            ),
+            const SizedBox(height: 12),
+            SwitchListTile(
+              contentPadding: EdgeInsets.zero,
+              title: const Text("Enable shift comments"),
+              value: shiftCommentsEnabled ?? false,
+              onChanged: _toggleShiftComments,
+            ),
+            const Divider(),
+            SwitchListTile(
+              contentPadding: EdgeInsets.zero,
+              title: const Text("Enable shift checklists"),
+              value: shiftChecklistsEnabled ?? false,
+              onChanged: _toggleShiftChecklists,
+            ),
+            if (shiftChecklistsEnabled == true) ...[
+              const SizedBox(height: 8),
+              ...checklistItems.map((item) => ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    dense: true,
+                    title: Text(item.label, style: const TextStyle(fontSize: 13)),
+                    trailing: IconButton(
+                      icon: const Icon(Icons.close, size: 16),
+                      onPressed: () => _deleteChecklistItem(item),
+                    ),
+                  )),
+              Row(
+                children: [
+                  Expanded(
+                    child: TextField(
+                      controller: _newChecklistItemController,
+                      decoration: const InputDecoration(
+                        hintText: "e.g. Lock the register",
+                        isDense: true,
+                      ),
+                    ),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.add),
+                    onPressed: savingShiftExtras ? null : _addChecklistItem,
+                  ),
+                ],
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _clockInPhotoSection() {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              "Photo at Clock-In",
+              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+            ),
+            const SizedBox(height: 4),
+            const Text(
+              "Requires a quick front-camera photo every time someone "
+              "clocks in. Off by default. Photos are private — only "
+              "visible to managers, never public.",
+              style: TextStyle(fontSize: 12, color: Colors.grey),
+            ),
+            const SizedBox(height: 12),
+            SwitchListTile(
+              contentPadding: EdgeInsets.zero,
+              title: const Text("Require photo to clock in"),
+              value: clockInPhotoEnabled ?? false,
+              onChanged: _toggleClockInPhoto,
             ),
           ],
         ),
