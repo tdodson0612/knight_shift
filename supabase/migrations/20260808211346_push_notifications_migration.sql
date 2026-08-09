@@ -31,6 +31,7 @@ create table if not exists public.user_device_tokens (
   updated_at timestamptz not null default now(),
   unique (user_id, token)
 );
+alter table public.user_device_tokens enable row level security;
 
 -- RLS: a user can only see/insert/delete their own tokens.
 create policy "user_device_tokens_select_own"

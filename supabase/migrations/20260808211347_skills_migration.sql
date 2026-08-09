@@ -17,6 +17,7 @@ create table if not exists public.employee_skills (
   created_at timestamptz not null default now(),
   unique (company_id, label)
 );
+alter table public.employee_skills enable row level security;
 
 -- 2. Which employees have which skill.
 create table if not exists public.employee_skill_assignments (
@@ -27,6 +28,7 @@ create table if not exists public.employee_skill_assignments (
   created_at timestamptz not null default now(),
   unique (user_id, skill_id)
 );
+alter table public.employee_skill_assignments enable row level security;
 
 -- 3. Optional required-skill on a shift.
 alter table public.shifts
