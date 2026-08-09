@@ -7,9 +7,11 @@ import '../../core/services/shift_service.dart';
 import '../../core/services/employee_service.dart';
 import '../../core/services/labor_budget_service.dart';
 import '../../core/services/overtime_service.dart';
+import '../../core/services/employee_skill_service.dart';
 
 import '../../shared/models/shift_model.dart';
 import '../../shared/models/employee_profile.dart';
+import '../../shared/models/employee_skill_model.dart';
 import '../scheduling/shift_detail_sheet.dart';
 import 'recurring_shift_screen.dart';
 
@@ -468,6 +470,25 @@ class _ManagerSchedulingScreenState extends State<ManagerSchedulingScreen> {
     return "$hour:$minute";
   }
 
+  Future<String?> _pickRequiredSkill(List<EmployeeSkill> skills) async {
+    return showDialog<String>(
+      context: context,
+      builder: (dialogContext) => SimpleDialog(
+        title: const Text("Required Skill (optional)"),
+        children: [
+          const SimpleDialogOption(
+            onPressed: null,
+            child: Text("No required skill"),
+          ),
+          ...skills.map((s) => SimpleDialogOption(
+                onPressed: () => Navigator.pop(dialogContext, s.id),
+                child: Text(s.label),
+              )),
+        ],
+      ),
+    );
+  }
+
   // ----------------------------
   // COPY THIS WEEK TO NEXT WEEK (schedule templates)
   // ----------------------------
@@ -659,6 +680,30 @@ class _ManagerSchedulingScreenState extends State<ManagerSchedulingScreen> {
         // Projection failed — fail open, don't block scheduling.
       }
 
+      String? requiredSkillId;
+      try {
+        final allSkills = await EmployeeSkillService.getSkills(companyId);
+        if (allSkills.isNotEmpty) {
+          requiredSkillId = await _pickRequiredSkill(allSkills);
+          if (requiredSkillId != null) {
+            final lacksSkill = await EmployeeSkillService.userLacksSkill(
+              companyId: companyId,
+              userId: userId,
+              skillId: requiredSkillId,
+            );
+            if (lacksSkill) {
+              final skill = allSkills.firstWhere((s) => s.id == requiredSkillId);
+              final emp = _employeeFor(userId);
+              advisoryWarnings.add(
+                "${emp?.displayName ?? 'Assigned employee'} lacks required skill: ${skill.label}",
+              );
+            }
+          }
+        }
+      } catch (_) {
+        // Skill check failed — fail open, don't block scheduling.
+      }
+
       if (advisoryWarnings.isNotEmpty) {
         if (!mounted) return;
         final proceed = await showDialog<bool>(
@@ -690,6 +735,7 @@ class _ManagerSchedulingScreenState extends State<ManagerSchedulingScreen> {
         createdBy: userId,
         status: 'approved',
         origin: 'manager_scheduled',
+        requiredSkillId: requiredSkillId,
       );
 
       await load();
