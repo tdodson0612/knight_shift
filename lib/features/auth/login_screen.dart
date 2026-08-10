@@ -66,71 +66,78 @@ class _LoginScreenState extends State<LoginScreen> {
       body: Center(
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(24),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              // 🛡️ LOGO
-              Image.asset(
-                'assets/images/knightshiftlogo.png',
-                height: 110,
-              ),
-
-              const SizedBox(height: 20),
-
-              const Text(
-                "Knight Shift",
-                style: TextStyle(
-                  fontSize: 26,
-                  fontWeight: FontWeight.bold,
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 400),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Image.asset(
+                  'assets/images/knightshiftlogo.png',
+                  height: 100,
                 ),
-              ),
-
-              const SizedBox(height: 6),
-
-              const Text(
-                "Workforce management platform",
-                style: TextStyle(color: Colors.grey),
-              ),
-
-              const SizedBox(height: 30),
-
-              TextField(
-                controller: emailController,
-                keyboardType: TextInputType.emailAddress,
-                decoration: const InputDecoration(
-                  labelText: "Email",
-                  border: OutlineInputBorder(),
+                const SizedBox(height: 24),
+                const Text(
+                  "Knight Shift",
+                  style: TextStyle(
+                    fontSize: 28,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: -0.5,
+                  ),
                 ),
-              ),
-
-              const SizedBox(height: 12),
-
-              TextField(
-                controller: passwordController,
-                obscureText: true,
-                decoration: const InputDecoration(
-                  labelText: "Password",
-                  border: OutlineInputBorder(),
+                const SizedBox(height: 6),
+                Text(
+                  "Workforce management platform",
+                  style: TextStyle(
+                    fontSize: 15,
+                    color: Colors.grey.shade600,
+                  ),
                 ),
-              ),
+                const SizedBox(height: 36),
 
-              const SizedBox(height: 20),
+                TextField(
+                  controller: emailController,
+                  keyboardType: TextInputType.emailAddress,
+                  textInputAction: TextInputAction.next,
+                  decoration: const InputDecoration(
+                    labelText: "Email",
+                    border: OutlineInputBorder(),
+                    prefixIcon: Icon(Icons.email_outlined),
+                  ),
+                ),
+                const SizedBox(height: 16),
+
+                TextField(
+                  controller: passwordController,
+                  obscureText: true,
+                  textInputAction: TextInputAction.done,
+                  decoration: const InputDecoration(
+                    labelText: "Password",
+                    border: OutlineInputBorder(),
+                    prefixIcon: Icon(Icons.lock_outline),
+                  ),
+                ),
+                const SizedBox(height: 24),
 
               SizedBox(
                 width: double.infinity,
+                height: 50,
                 child: ElevatedButton(
                   onPressed: loading ? null : login,
-                  child: Text(loading ? "Loading..." : "Login"),
+                  child: Text(
+                    loading ? "Loading..." : "Login",
+                    style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+                  ),
                 ),
               ),
 
-              const SizedBox(height: 10),
+                const SizedBox(height: 12),
 
-              TextButton(
-                onPressed: loading ? null : _openSignup,
-                child: const Text("Create account"),
-              ),
-            ],
+                TextButton(
+                  onPressed: loading ? null : _openSignup,
+                  child: const Text("Create account"),
+                ),
+              ],
+            ),
           ),
         ),
       ),

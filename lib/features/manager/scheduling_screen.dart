@@ -67,6 +67,11 @@ class _ManagerSchedulingScreenState extends State<ManagerSchedulingScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final now = DateTime.now();
+    final weekStart = DateTime(now.year, now.month, now.day)
+        .subtract(Duration(days: now.weekday - DateTime.monday));
+    final weekEnd = weekStart.add(const Duration(days: 6));
+
     return Scaffold(
       appBar: AppBar(
         title: const Text("Weekly Schedule"),
@@ -86,6 +91,7 @@ class _ManagerSchedulingScreenState extends State<ManagerSchedulingScreen> {
           ),
           IconButton(
             icon: const Icon(Icons.refresh),
+            tooltip: "Refresh",
             onPressed: load,
           ),
         ],
@@ -96,13 +102,25 @@ class _ManagerSchedulingScreenState extends State<ManagerSchedulingScreen> {
               children: [
                 Container(
                   width: double.infinity,
-                  padding: const EdgeInsets.symmetric(vertical: 6),
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  color: Colors.teal.shade50,
+                  child: Text(
+                    "Week of ${_fmtDate(weekStart)} – ${_fmtDate(weekEnd)}",
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.teal.shade700,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                ),
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
                   color: Colors.teal.shade50,
                   child: const Text(
-                    "Tap an empty slot to schedule yourself • "
-                    "Long-press to post an open shift • "
-                    "Long-press an existing shift for comments/checklist",
-                    style: TextStyle(fontSize: 11, color: Colors.teal),
+                    "Tap empty slot to schedule • Long-press empty slot for open shift • Long-press shift for details",
+                    style: TextStyle(fontSize: 12, color: Colors.teal),
                     textAlign: TextAlign.center,
                   ),
                 ),
@@ -130,19 +148,45 @@ class _ManagerSchedulingScreenState extends State<ManagerSchedulingScreen> {
 
   Widget _header() {
     const days = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+    final now = DateTime.now();
+    final weekStart = DateTime(now.year, now.month, now.day)
+        .subtract(Duration(days: now.weekday - DateTime.monday));
 
     return Row(
-      children: days
-          .map(
-            (d) => Expanded(
-              child: Container(
-                padding: const EdgeInsets.all(10),
-                color: Colors.grey.shade200,
-                child: Center(child: Text(d)),
-              ),
+      children: List.generate(7, (i) {
+        final date = weekStart.add(Duration(days: i));
+        final isToday = date.year == now.year &&
+            date.month == now.month &&
+            date.day == now.day;
+
+        return Expanded(
+          child: Container(
+            padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
+            color: isToday ? Colors.teal.shade100 : Colors.grey.shade200,
+            child: Column(
+              children: [
+                Text(
+                  days[i],
+                  style: TextStyle(
+                    fontWeight: isToday ? FontWeight.w700 : FontWeight.w600,
+                    fontSize: 12,
+                    color: isToday ? Colors.teal.shade900 : Colors.grey.shade800,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  "${date.month}/${date.day}",
+                  style: TextStyle(
+                    fontWeight: isToday ? FontWeight.w700 : FontWeight.w400,
+                    fontSize: 11,
+                    color: isToday ? Colors.teal.shade700 : Colors.grey.shade600,
+                  ),
+                ),
+              ],
             ),
-          )
-          .toList(),
+          ),
+        );
+      }),
     );
   }
 
@@ -211,11 +255,20 @@ class _ManagerSchedulingScreenState extends State<ManagerSchedulingScreen> {
 
     final block = Container(
       height: height,
-      padding: const EdgeInsets.all(4),
+      padding: const EdgeInsets.all(5),
       decoration: BoxDecoration(
         color: _statusColor(s),
         borderRadius: BorderRadius.circular(6),
-        border: s.isOpen ? Border.all(color: Colors.teal, width: 1.5) : null,
+        border: s.isOpen
+            ? Border.all(color: Colors.teal.shade700, width: 1.5)
+            : null,
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.06),
+            blurRadius: 2,
+            offset: const Offset(0, 1),
+          ),
+        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -223,14 +276,34 @@ class _ManagerSchedulingScreenState extends State<ManagerSchedulingScreen> {
         children: [
           Text(
             label,
-            style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+            style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
             overflow: TextOverflow.ellipsis,
+            maxLines: 1,
           ),
+          const SizedBox(height: 2),
           Text(
-            s.displayStatus,
-            style: const TextStyle(fontSize: 10),
+            "${_formatTime(start)} – ${_formatTime(end)}",
+            style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w500),
             overflow: TextOverflow.ellipsis,
           ),
+          if (s.requiredSkillId != null) ...[
+            const SizedBox(height: 2),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+              decoration: BoxDecoration(
+                color: Colors.white.withValues(alpha: 0.7),
+                borderRadius: BorderRadius.circular(3),
+              ),
+              child: Text(
+                "Skill required",
+                style: TextStyle(
+                  fontSize: 9,
+                  fontWeight: FontWeight.w600,
+                  color: Colors.grey.shade700,
+                ),
+              ),
+            ),
+          ],
         ],
       ),
     );
@@ -468,6 +541,10 @@ class _ManagerSchedulingScreenState extends State<ManagerSchedulingScreen> {
     final hour = dt.hour.toString().padLeft(2, '0');
     final minute = dt.minute.toString().padLeft(2, '0');
     return "$hour:$minute";
+  }
+
+  String _fmtDate(DateTime dt) {
+    return "${dt.month}/${dt.day}/${dt.year}";
   }
 
   Future<String?> _pickRequiredSkill(List<EmployeeSkill> skills) async {

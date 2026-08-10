@@ -250,15 +250,18 @@ class _PayrollScreenState extends State<PayrollScreen> {
         title: const Text("Payroll"),
         actions: [
           IconButton(
-            icon: const Icon(Icons.date_range),
+            icon: const Icon(Icons.date_range_outlined),
+            tooltip: "Change period",
             onPressed: () async {},
           ),
           IconButton(
-            icon: const Icon(Icons.file_download),
+            icon: const Icon(Icons.file_download_outlined),
+            tooltip: "Export CSV",
             onPressed: exporting ? null : exportPayroll,
           ),
           IconButton(
-            icon: const Icon(Icons.play_arrow),
+            icon: const Icon(Icons.play_arrow_outlined),
+            tooltip: "Generate payroll",
             onPressed: generating ? null : generatePayroll,
           ),
         ],
@@ -268,52 +271,193 @@ class _PayrollScreenState extends State<PayrollScreen> {
           : ListView(
               padding: const EdgeInsets.all(16),
               children: [
-                Text(
-                  "Period: ${start.toLocal()} → ${end.toLocal()}",
-                  style: const TextStyle(fontWeight: FontWeight.bold),
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.grey.shade50,
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: Colors.grey.shade200),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.calendar_today_outlined, size: 18, color: Colors.grey),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Text(
+                          "Period: ${_formatDate(start)} → ${_formatDate(end)}",
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w500,
+                            color: Colors.grey.shade800,
+                          ),
+                        ),
+                      ),
+                      if (overtimeSettings.anyThresholdEnabled) _overtimeModeChip(),
+                    ],
+                  ),
                 ),
-                if (overtimeSettings.anyThresholdEnabled) ...[
-                  const SizedBox(height: 8),
-                  _overtimeModeChip(),
-                ],
                 const SizedBox(height: 20),
                 ...hoursByUser.entries.map((e) {
                   final breakdown = breakdownByUser[e.key];
 
                   if (breakdown == null) {
-                    // No overtime thresholds enabled — original,
-                    // simple display.
                     final rate = hourlyRates[e.key] ?? 20.0;
                     final pay = e.value * rate;
 
-                    return ListTile(
-                      leading: const Icon(Icons.person),
-                      title: Text(name(e.key)),
-                      subtitle:
-                          Text("${e.value.toStringAsFixed(2)} hrs × \$$rate"),
-                      trailing: Text("\$${pay.toStringAsFixed(2)}"),
+                    return Card(
+                      elevation: 0,
+                      color: Colors.white,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        side: BorderSide(color: Colors.grey.shade200),
+                      ),
+                      child: ListTile(
+                        contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 12,
+                        ),
+                        leading: CircleAvatar(
+                          radius: 20,
+                          backgroundColor: Colors.grey.shade100,
+                          child: Text(
+                            name(e.key).substring(0, 1).toUpperCase(),
+                            style: TextStyle(
+                              color: Colors.grey.shade700,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                        title: Text(
+                          name(e.key),
+                          style: const TextStyle(fontWeight: FontWeight.w600),
+                        ),
+                        subtitle: Text(
+                          "${e.value.toStringAsFixed(2)} hrs × \$${rate.toStringAsFixed(2)}",
+                          style: TextStyle(fontSize: 13, color: Colors.grey.shade600),
+                        ),
+                        trailing: Text(
+                          "\$${pay.toStringAsFixed(2)}",
+                          style: const TextStyle(
+                            fontWeight: FontWeight.w700,
+                            fontSize: 15,
+                          ),
+                        ),
+                      ),
                     );
                   }
 
                   final hasOT = breakdown.overtimeHours > 0;
 
-                  return ListTile(
-                    leading: Icon(
-                      Icons.person,
-                      color: hasOT ? Colors.orange : null,
+                  return Card(
+                    elevation: 0,
+                    color: Colors.white,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      side: BorderSide(color: Colors.grey.shade200),
                     ),
-                    title: Text(name(e.key)),
-                    subtitle: Text(
-                      hasOT
-                          ? "${breakdown.regularHours.toStringAsFixed(2)} reg + "
-                              "${breakdown.overtimeHours.toStringAsFixed(2)} OT hrs"
-                          : "${breakdown.totalHours.toStringAsFixed(2)} hrs",
-                    ),
-                    trailing: Text(
-                      "\$${breakdown.totalPay.toStringAsFixed(2)}",
-                      style: TextStyle(
-                        color: hasOT ? Colors.orange[800] : null,
-                        fontWeight: hasOT ? FontWeight.bold : null,
+                    child: Padding(
+                      padding: const EdgeInsets.all(16),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              CircleAvatar(
+                                radius: 20,
+                                backgroundColor: hasOT
+                                    ? Colors.orange.shade50
+                                    : Colors.grey.shade100,
+                                child: Icon(
+                                  Icons.person_outline,
+                                  color: hasOT
+                                      ? Colors.orange.shade700
+                                      : Colors.grey.shade600,
+                                  size: 20,
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Text(
+                                  name(e.key),
+                                  style: const TextStyle(
+                                    fontSize: 15,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ),
+                              if (hasOT)
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 8,
+                                    vertical: 4,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: Colors.orange.withValues(alpha: 0.1),
+                                    borderRadius: BorderRadius.circular(6),
+                                  ),
+                                  child: Text(
+                                    "OT",
+                                    style: TextStyle(
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w700,
+                                      color: Colors.orange.shade700,
+                                    ),
+                                  ),
+                                ),
+                            ],
+                          ),
+                          const SizedBox(height: 12),
+                          Row(
+                            children: [
+                              Expanded(
+                                child: _payStat(
+                                  label: "Regular",
+                                  hours: breakdown.regularHours,
+                                  rate: hourlyRates[e.key] ?? 20.0,
+                                  color: Colors.grey.shade700,
+                                ),
+                              ),
+                              if (hasOT) ...[
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: _payStat(
+                                    label: "Overtime",
+                                    hours: breakdown.overtimeHours,
+                                    rate: (hourlyRates[e.key] ?? 20.0) *
+                                        overtimeSettings.multiplier,
+                                    color: Colors.orange.shade700,
+                                  ),
+                                ),
+                              ],
+                            ],
+                          ),
+                          const SizedBox(height: 12),
+                          const Divider(height: 1),
+                          const SizedBox(height: 8),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Text(
+                                "Total pay",
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w600,
+                                  color: Colors.grey.shade700,
+                                ),
+                              ),
+                              Text(
+                                "\$${breakdown.totalPay.toStringAsFixed(2)}",
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w800,
+                                  color: hasOT
+                                      ? Colors.orange.shade800
+                                      : Colors.grey.shade900,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
                       ),
                     ),
                   );
@@ -321,6 +465,49 @@ class _PayrollScreenState extends State<PayrollScreen> {
               ],
             ),
     );
+  }
+
+  Widget _payStat({
+    required String label,
+    required double hours,
+    required double rate,
+    required Color color,
+  }) {
+    final pay = hours * rate;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: TextStyle(
+            fontSize: 11,
+            fontWeight: FontWeight.w500,
+            color: Colors.grey.shade600,
+          ),
+        ),
+        const SizedBox(height: 2),
+        Text(
+          "${hours.toStringAsFixed(2)} hrs",
+          style: TextStyle(
+            fontSize: 14,
+            fontWeight: FontWeight.w600,
+            color: Colors.grey.shade800,
+          ),
+        ),
+        Text(
+          "\$${pay.toStringAsFixed(2)}",
+          style: TextStyle(
+            fontSize: 13,
+            fontWeight: FontWeight.w700,
+            color: color,
+          ),
+        ),
+      ],
+    );
+  }
+
+  String _formatDate(DateTime d) {
+    return "${d.month}/${d.day}/${d.year}";
   }
 
   Widget _overtimeModeChip() {

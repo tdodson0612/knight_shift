@@ -528,21 +528,33 @@ class _ManagerDashboardState extends State<ManagerDashboard> {
 
   Widget _card(String title, String value) => Expanded(
         child: Card(
+          elevation: 0,
+          color: Colors.grey.shade50,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+            side: BorderSide(color: Colors.grey.shade200),
+          ),
           child: Padding(
-            padding: const EdgeInsets.all(12),
+            padding: const EdgeInsets.all(16),
             child: Column(
               children: [
                 Text(
                   value,
-                  style: const TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
+                  style: TextStyle(
+                    fontSize: 24,
+                    fontWeight: FontWeight.w700,
+                    color: Colors.grey.shade900,
                   ),
                 ),
+                const SizedBox(height: 4),
                 Text(
                   title,
                   textAlign: TextAlign.center,
-                  style: const TextStyle(fontSize: 11),
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: Colors.grey.shade600,
+                    fontWeight: FontWeight.w500,
+                  ),
                 ),
               ],
             ),
@@ -554,42 +566,63 @@ class _ManagerDashboardState extends State<ManagerDashboard> {
   // INVITE BOX
   // ----------------------------
   Widget _inviteBox() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const Text(
-          "Invite Someone",
-          style: TextStyle(fontWeight: FontWeight.bold),
-        ),
-        TextField(
-          controller: emailController,
-          decoration: const InputDecoration(hintText: "Email"),
-        ),
-        const SizedBox(height: 8),
-        DropdownButtonFormField<String>(
-          initialValue: inviteRole,
-          decoration: const InputDecoration(
-            labelText: "Role",
-            border: OutlineInputBorder(),
-            isDense: true,
-          ),
-          // 'admin' deliberately excluded from this casual invite
-          // box — granting full admin should be a more deliberate
-          // action than a quick email + role pick.
-          items: const [
-            DropdownMenuItem(value: 'employee', child: Text("Employee")),
-            DropdownMenuItem(value: 'manager', child: Text("Manager")),
-            DropdownMenuItem(
-                value: 'accountant', child: Text("Accountant (read-only payroll)")),
+    return Card(
+      elevation: 0,
+      color: Colors.white,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+        side: BorderSide(color: Colors.grey.shade200),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              "Invite Someone",
+              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: emailController,
+              decoration: InputDecoration(
+                hintText: "Email address",
+                prefixIcon: const Icon(Icons.email_outlined, size: 20),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                isDense: true,
+              ),
+            ),
+            const SizedBox(height: 12),
+            DropdownButtonFormField<String>(
+              initialValue: inviteRole,
+              decoration: InputDecoration(
+                labelText: "Role",
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                isDense: true,
+              ),
+              items: const [
+                DropdownMenuItem(value: 'employee', child: Text("Employee")),
+                DropdownMenuItem(value: 'manager', child: Text("Manager")),
+                DropdownMenuItem(
+                    value: 'accountant', child: Text("Accountant (read-only payroll)")),
+              ],
+              onChanged: (v) => setState(() => inviteRole = v ?? 'employee'),
+            ),
+            const SizedBox(height: 12),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton(
+                onPressed: sendInvite,
+                child: const Text("Send Invite"),
+              ),
+            ),
           ],
-          onChanged: (v) => setState(() => inviteRole = v ?? 'employee'),
         ),
-        const SizedBox(height: 8),
-        ElevatedButton(
-          onPressed: sendInvite,
-          child: const Text("Send Invite"),
-        ),
-      ],
+      ),
     );
   }
 
@@ -597,27 +630,69 @@ class _ManagerDashboardState extends State<ManagerDashboard> {
   // EMPLOYEES
   // ----------------------------
   Widget _employeesList() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const Text(
-          "Employees",
-          style: TextStyle(fontWeight: FontWeight.bold),
-        ),
-        if (employees.isEmpty)
-          const Padding(
-            padding: EdgeInsets.symmetric(vertical: 8),
-            child: Text("No employees yet", style: TextStyle(color: Colors.grey)),
-          )
-        else
-          ...employees.map((e) => ListTile(
-                leading: CircleAvatar(
-                  child: Text(e.initials),
+    return Card(
+      elevation: 0,
+      color: Colors.white,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+        side: BorderSide(color: Colors.grey.shade200),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                const Icon(Icons.people_outline, size: 20, color: Colors.grey),
+                const SizedBox(width: 8),
+                Text(
+                  "Employees",
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w700,
+                    color: Colors.grey.shade900,
+                  ),
                 ),
-                title: Text(e.displayName),
-                subtitle: Text(e.role),
-              )),
-      ],
+              ],
+            ),
+            const SizedBox(height: 12),
+            if (employees.isEmpty)
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 12),
+                child: Text(
+                  "No employees yet",
+                  style: TextStyle(color: Colors.grey.shade500, fontSize: 14),
+                ),
+              )
+            else
+              ...employees.map((e) => ListTile(
+                    dense: true,
+                    contentPadding: EdgeInsets.zero,
+                    leading: CircleAvatar(
+                      radius: 18,
+                      backgroundColor: Colors.teal.shade50,
+                      child: Text(
+                        e.initials,
+                        style: TextStyle(
+                          color: Colors.teal.shade700,
+                          fontWeight: FontWeight.w600,
+                          fontSize: 13,
+                        ),
+                      ),
+                    ),
+                    title: Text(
+                      e.displayName,
+                      style: const TextStyle(fontWeight: FontWeight.w500),
+                    ),
+                    subtitle: Text(
+                      e.role,
+                      style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+                    ),
+                  )),
+          ],
+        ),
+      ),
     );
   }
 
@@ -625,25 +700,58 @@ class _ManagerDashboardState extends State<ManagerDashboard> {
   // INVITES
   // ----------------------------
   Widget _invitesList() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const Text(
-          "Invites",
-          style: TextStyle(fontWeight: FontWeight.bold),
+    return Card(
+      elevation: 0,
+      color: Colors.white,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+        side: BorderSide(color: Colors.grey.shade200),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                const Icon(Icons.mail_outline, size: 20, color: Colors.grey),
+                const SizedBox(width: 8),
+                Text(
+                  "Invites",
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w700,
+                    color: Colors.grey.shade900,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            if (invites.isEmpty)
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 12),
+                child: Text(
+                  "No pending invites",
+                  style: TextStyle(color: Colors.grey.shade500, fontSize: 14),
+                ),
+              )
+            else
+              ...invites.map((i) => ListTile(
+                    dense: true,
+                    contentPadding: EdgeInsets.zero,
+                    leading: Icon(Icons.mail_outline, size: 20, color: Colors.grey.shade600),
+                    title: Text(
+                      i.email,
+                      style: const TextStyle(fontWeight: FontWeight.w500),
+                    ),
+                    subtitle: Text(
+                      i.status,
+                      style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+                    ),
+                  )),
+          ],
         ),
-        if (invites.isEmpty)
-          const Padding(
-            padding: EdgeInsets.symmetric(vertical: 8),
-            child: Text("No pending invites", style: TextStyle(color: Colors.grey)),
-          )
-        else
-          ...invites.map((i) => ListTile(
-                leading: const Icon(Icons.mail),
-                title: Text(i.email),
-                subtitle: Text(i.status),
-              )),
-      ],
+      ),
     );
   }
 
@@ -651,27 +759,66 @@ class _ManagerDashboardState extends State<ManagerDashboard> {
   // SHIFTS
   // ----------------------------
   Widget _shiftsList() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const Text(
-          "Shifts",
-          style: TextStyle(fontWeight: FontWeight.bold),
-        ),
-        if (shifts.isEmpty)
-          const Padding(
-            padding: EdgeInsets.symmetric(vertical: 8),
-            child: Text("No shifts scheduled yet", style: TextStyle(color: Colors.grey)),
-          )
-        else
-          ...shifts.take(15).map((s) => ListTile(
-                leading: const Icon(Icons.schedule),
-                title: Text(nameFor(s.userId)),
-                subtitle: Text(
-                  "In: ${s.startTime} • Out: ${s.endTime}",
+    return Card(
+      elevation: 0,
+      color: Colors.white,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+        side: BorderSide(color: Colors.grey.shade200),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                const Icon(Icons.schedule_outlined, size: 20, color: Colors.grey),
+                const SizedBox(width: 8),
+                Text(
+                  "Recent Shifts",
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w700,
+                    color: Colors.grey.shade900,
+                  ),
                 ),
-              )),
-      ],
+              ],
+            ),
+            const SizedBox(height: 12),
+            if (shifts.isEmpty)
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 12),
+                child: Text(
+                  "No shifts scheduled yet",
+                  style: TextStyle(color: Colors.grey.shade500, fontSize: 14),
+                ),
+              )
+            else
+              ...shifts.take(15).map((s) => ListTile(
+                    dense: true,
+                    contentPadding: EdgeInsets.zero,
+                    leading: Icon(Icons.schedule_outlined, size: 20, color: Colors.grey.shade600),
+                    title: Text(
+                      nameFor(s.userId),
+                      style: const TextStyle(fontWeight: FontWeight.w500),
+                    ),
+                    subtitle: Text(
+                      "${_formatDateTime(s.startTime)} → ${_formatDateTime(s.endTime)}",
+                      style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+                    ),
+                  )),
+          ],
+        ),
+      ),
     );
+  }
+
+  String _formatDateTime(DateTime dt) {
+    final month = dt.month.toString().padLeft(2, '0');
+    final day = dt.day.toString().padLeft(2, '0');
+    final hour = dt.hour.toString().padLeft(2, '0');
+    final minute = dt.minute.toString().padLeft(2, '0');
+    return "$month/$day $hour:$minute";
   }
 }

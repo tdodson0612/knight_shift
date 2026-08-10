@@ -355,52 +355,124 @@ class _HomeScreenState extends State<HomeScreen> {
               children: [
                 if (subscription != null && subscription!.isLocked)
                   _lockedBanner(),
-                Expanded(
+                 Expanded(
                   child: Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Text("Role: $role"),
-                        const SizedBox(height: 10),
-
-                        Text(
-                          clockedIn ? "ON SHIFT" : "OFF SHIFT",
-                          style: const TextStyle(
-                            fontSize: 28,
-                            fontWeight: FontWeight.bold,
+                    child: SingleChildScrollView(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 16,
+                              vertical: 8,
+                            ),
+                            decoration: BoxDecoration(
+                              color: Colors.grey.shade100,
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Text(
+                              "Role: $role",
+                              style: TextStyle(
+                                fontSize: 13,
+                                color: Colors.grey.shade700,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
                           ),
-                        ),
+                          const SizedBox(height: 24),
 
-                        const SizedBox(height: 20),
+                          Text(
+                            clockedIn ? "ON SHIFT" : "OFF SHIFT",
+                            style: TextStyle(
+                              fontSize: 32,
+                              fontWeight: FontWeight.w800,
+                              color: clockedIn
+                                  ? Colors.green.shade700
+                                  : Colors.grey.shade700,
+                              letterSpacing: 1,
+                            ),
+                          ),
 
-                        ElevatedButton(
-                          onPressed: _toggleClock,
-                          child: Text(clockedIn ? "Clock Out" : "Clock In"),
-                        ),
+                          const SizedBox(height: 8),
 
-                        const SizedBox(height: 20),
+                          Text(
+                            activeShiftId != null
+                                ? "Shift in progress"
+                                : "Ready to clock in",
+                            style: TextStyle(
+                              fontSize: 14,
+                              color: Colors.grey.shade600,
+                            ),
+                          ),
 
-                        Text(
-                          activeShiftId != null
-                              ? "Shift active"
-                              : "No active shift",
-                        ),
+                          const SizedBox(height: 32),
 
-                        const SizedBox(height: 30),
-
-                        if (isManager)
-                          ElevatedButton(
-                            onPressed: () {
-                              Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (_) => const ManagerDashboard(),
+                          SizedBox(
+                            width: 260,
+                            height: 64,
+                            child: ElevatedButton(
+                              onPressed: _toggleClock,
+                              style: ButtonStyle(
+                                backgroundColor: WidgetStateProperty.all(
+                                  clockedIn ? Colors.red.shade600 : Colors.teal.shade600,
                                 ),
-                              );
-                            },
-                            child: const Text("Manager Dashboard"),
+                                foregroundColor: WidgetStateProperty.all(Colors.white),
+                                overlayColor: WidgetStateProperty.resolveWith(
+                                  (states) => states.contains(WidgetState.pressed)
+                                      ? Colors.black.withValues(alpha: 0.1)
+                                      : null,
+                                ),
+                                elevation: WidgetStateProperty.all(2),
+                                shape: WidgetStateProperty.all(
+                                  RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                ),
+                              ),
+                              child: Text(
+                                clockedIn ? "Clock Out" : "Clock In",
+                                style: const TextStyle(
+                                  fontSize: 20,
+                                  fontWeight: FontWeight.w700,
+                                  letterSpacing: 0.5,
+                                ),
+                              ),
+                            ),
                           ),
-                      ],
+
+                          const SizedBox(height: 32),
+
+                          if (isManager)
+                            OutlinedButton.icon(
+                              onPressed: () {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (_) => const ManagerDashboard(),
+                                  ),
+                                );
+                              },
+                              icon: const Icon(Icons.dashboard_outlined, size: 20),
+                              label: const Text("Manager Dashboard"),
+                              style: ButtonStyle(
+                                padding: WidgetStateProperty.all(
+                                  const EdgeInsets.symmetric(
+                                    horizontal: 20,
+                                    vertical: 12,
+                                  ),
+                                ),
+                                shape: WidgetStateProperty.all(
+                                  RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(10),
+                                  ),
+                                ),
+                                side: WidgetStateProperty.all(
+                                  BorderSide(color: Colors.grey.shade300),
+                                ),
+                              ),
+                            ),
+                        ],
+                      ),
                     ),
                   ),
                 ),

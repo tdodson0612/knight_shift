@@ -11,6 +11,7 @@ import '../../core/services/shift_service.dart';
 import '../../core/services/reliability_service.dart';
 import '../../core/services/employee_service.dart';
 import '../../core/services/employee_skill_service.dart';
+import '../../core/services/role_service.dart';
 import '../../shared/models/employee_skill_model.dart';
 
 const List<String> _dayNames = [
@@ -315,69 +316,233 @@ class _EmployeeProfileScreenState extends State<EmployeeProfileScreen> {
     return Scaffold(
       appBar: AppBar(
         title: Text(employee.displayName),
+        actions: [
+          if (RoleService.isManager()) ...[
+            IconButton(
+              icon: const Icon(Icons.edit_outlined),
+              tooltip: "Edit profile",
+              onPressed: null, // Future: inline edit mode
+            ),
+          ],
+        ],
       ),
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
-          Text("Name: ${employee.displayName}"),
-          Text("Role: ${employee.role}"),
-          Text("User ID: ${employee.userId}"),
-          const SizedBox(height: 4),
-          Row(
-            children: [
-              Text("Hourly Rate: \$${currentRate.toStringAsFixed(2)}"),
-              const SizedBox(width: 8),
-              InkWell(
-                onTap: savingRate ? null : _editRate,
-                child: Icon(Icons.edit, size: 16, color: Colors.grey[600]),
+          Card(
+            elevation: 0,
+            color: Colors.grey.shade50,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+              side: BorderSide(color: Colors.grey.shade200),
+            ),
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                children: [
+                  Row(
+                    children: [
+                      CircleAvatar(
+                        radius: 24,
+                        backgroundColor: Colors.teal.shade100,
+                        child: Text(
+                          employee.initials,
+                          style: TextStyle(
+                            color: Colors.teal.shade800,
+                            fontWeight: FontWeight.w700,
+                            fontSize: 16,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 16),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              employee.displayName,
+                              style: const TextStyle(
+                                fontSize: 18,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                            const SizedBox(height: 2),
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 8,
+                                vertical: 2,
+                              ),
+                              decoration: BoxDecoration(
+                                color: _roleColor(employee.role),
+                                borderRadius: BorderRadius.circular(4),
+                              ),
+                              child: Text(
+                                employee.role,
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w600,
+                                  color: _roleTextColor(employee.role),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                  const Divider(height: 1),
+                  const SizedBox(height: 12),
+                  _infoRow(
+                    icon: Icons.email_outlined,
+                    label: "Email",
+                    value: employee.email,
+                  ),
+                  const SizedBox(height: 12),
+                  _infoRow(
+                    icon: Icons.payments_outlined,
+                    label: "Hourly Rate",
+                    value: "\$${currentRate.toStringAsFixed(2)}",
+                    onTap: savingRate ? null : _editRate,
+                  ),
+                  const SizedBox(height: 12),
+                  _infoRow(
+                    icon: Icons.calendar_today_outlined,
+                    label: "Hire Date",
+                    value: currentHireDate == null
+                        ? "Not set"
+                        : _formatDate(currentHireDate!),
+                    onTap: savingHireDate ? null : _editHireDate,
+                  ),
+                ],
               ),
-            ],
+            ),
           ),
-          const SizedBox(height: 4),
-          Row(
-            children: [
-              Text(
-                currentHireDate == null
-                    ? "Hire Date: Not set"
-                    : "Hire Date: ${_formatDate(currentHireDate!)}",
-              ),
-              const SizedBox(width: 8),
-              InkWell(
-                onTap: savingHireDate ? null : _editHireDate,
-                child: Icon(Icons.edit, size: 16, color: Colors.grey[600]),
-              ),
-            ],
-          ),
-
-          const SizedBox(height: 24),
+          const SizedBox(height: 20),
           _skillsSection(),
-
-          const SizedBox(height: 24),
+          const SizedBox(height: 20),
           _reliabilitySection(),
-
-          const SizedBox(height: 24),
-          const Text(
-            "Availability",
-            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-          ),
-          const Divider(),
-
-          if (loadingAvailability)
-            const Padding(
-              padding: EdgeInsets.symmetric(vertical: 16),
-              child: Center(child: CircularProgressIndicator()),
-            )
-          else if (availability.isEmpty)
-            const Padding(
-              padding: EdgeInsets.symmetric(vertical: 8),
-              child: Text(
-                "No availability set yet",
-                style: TextStyle(color: Colors.grey),
+          const SizedBox(height: 20),
+          Card(
+            elevation: 0,
+            color: Colors.white,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+              side: BorderSide(color: Colors.grey.shade200),
+            ),
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      const Icon(Icons.schedule_outlined, size: 18, color: Colors.grey),
+                      const SizedBox(width: 8),
+                      Text(
+                        "Availability",
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w700,
+                          color: Colors.grey.shade900,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  if (loadingAvailability)
+                    const Padding(
+                      padding: EdgeInsets.symmetric(vertical: 16),
+                      child: Center(child: CircularProgressIndicator()),
+                    )
+                  else if (availability.isEmpty)
+                    Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 8),
+                      child: Text(
+                        "No availability set yet",
+                        style: TextStyle(color: Colors.grey.shade500, fontSize: 14),
+                      ),
+                    )
+                  else
+                    ...List.generate(7, (day) => _availabilityRow(day + 1)),
+                ],
               ),
-            )
-          else
-            for (int day = 1; day <= 7; day++) _availabilityRow(day),
+            ),
+          ),
         ],
+      ),
+    );
+  }
+
+  Color _roleColor(String role) {
+    switch (role.toLowerCase()) {
+      case 'manager':
+        return Colors.blue.shade50;
+      case 'admin':
+        return Colors.purple.shade50;
+      case 'accountant':
+        return Colors.amber.shade50;
+      default:
+        return Colors.grey.shade100;
+    }
+  }
+
+  Color _roleTextColor(String role) {
+    switch (role.toLowerCase()) {
+      case 'manager':
+        return Colors.blue.shade700;
+      case 'admin':
+        return Colors.purple.shade700;
+      case 'accountant':
+        return Colors.amber.shade700;
+      default:
+        return Colors.grey.shade700;
+    }
+  }
+
+  Widget _infoRow({
+    required IconData icon,
+    required String label,
+    required String value,
+    VoidCallback? onTap,
+  }) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(8),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 4),
+        child: Row(
+          children: [
+            Icon(icon, size: 18, color: Colors.grey.shade600),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    label,
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: Colors.grey.shade600,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                  const SizedBox(height: 1),
+                  Text(
+                    value,
+                    style: TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w500,
+                      color: Colors.grey.shade900,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            if (onTap != null)
+              Icon(Icons.edit_outlined, size: 16, color: Colors.grey.shade400),
+          ],
+        ),
       ),
     );
   }
@@ -394,22 +559,54 @@ class _EmployeeProfileScreenState extends State<EmployeeProfileScreen> {
       return const SizedBox.shrink();
     }
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const Text(
-          "Skills",
-          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+    return Card(
+      elevation: 0,
+      color: Colors.white,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+        side: BorderSide(color: Colors.grey.shade200),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                const Icon(Icons.verified_outlined, size: 18, color: Colors.grey),
+                const SizedBox(width: 8),
+                Text(
+                  "Skills",
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w700,
+                    color: Colors.grey.shade900,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: allSkills.map((skill) {
+                final assigned = assignedSkillIds.contains(skill.id);
+                return FilterChip(
+                  label: Text(skill.label),
+                  selected: assigned,
+                  onSelected: (v) => _toggleSkill(skill, v),
+                  selectedColor: Colors.teal.shade100,
+                  checkmarkColor: Colors.teal.shade700,
+                  labelStyle: TextStyle(
+                    color: assigned ? Colors.teal.shade800 : Colors.grey.shade700,
+                    fontWeight: assigned ? FontWeight.w600 : FontWeight.w400,
+                  ),
+                );
+              }).toList(),
+            ),
+          ],
         ),
-        const Divider(),
-        ...allSkills.map((skill) => CheckboxListTile(
-              contentPadding: EdgeInsets.zero,
-              dense: true,
-              title: Text(skill.label, style: const TextStyle(fontSize: 13)),
-              value: assignedSkillIds.contains(skill.id),
-              onChanged: (v) => _toggleSkill(skill, v ?? false),
-            )),
-      ],
+      ),
     );
   }
 
@@ -424,70 +621,144 @@ class _EmployeeProfileScreenState extends State<EmployeeProfileScreen> {
     final settings = reliabilitySettings;
 
     if (settings == null || !settings.enabled) {
-      // Not enabled for this company — say nothing dramatic, just
-      // skip the section rather than showing an empty/zero score
-      // that could look like a real judgment on the employee.
       return const SizedBox.shrink();
     }
 
     final stats = reliabilityStats;
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const Text(
-          "Reliability",
-          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-        ),
-        Text(
-          "Last $_reliabilityLookbackDays days",
-          style: const TextStyle(fontSize: 12, color: Colors.grey),
-        ),
-        const Divider(),
-        if (stats == null || stats.shiftsEvaluated == 0)
-          const Padding(
-            padding: EdgeInsets.symmetric(vertical: 8),
-            child: Text(
-              "No completed shifts in this period yet",
-              style: TextStyle(color: Colors.grey),
-            ),
-          )
-        else ...[
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              const Text("Score", style: TextStyle(fontSize: 15)),
-              Text(
-                stats.score.toStringAsFixed(0),
-                style: TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.bold,
-                  color: _scoreColor(stats.score),
+    return Card(
+      elevation: 0,
+      color: Colors.white,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+        side: BorderSide(color: Colors.grey.shade200),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                const Icon(Icons.analytics_outlined, size: 18, color: Colors.grey),
+                const SizedBox(width: 8),
+                Text(
+                  "Reliability",
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w700,
+                    color: Colors.grey.shade900,
+                  ),
                 ),
+              ],
+            ),
+            const SizedBox(height: 4),
+            Text(
+              "Last $_reliabilityLookbackDays days",
+              style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+            ),
+            const SizedBox(height: 12),
+            if (stats == null || stats.shiftsEvaluated == 0)
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 8),
+                child: Text(
+                  "No completed shifts in this period yet",
+                  style: TextStyle(color: Colors.grey.shade500, fontSize: 14),
+                ),
+              )
+            else ...[
+              Row(
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          "Score",
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: Colors.grey.shade600,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          stats.score.toStringAsFixed(0),
+                          style: TextStyle(
+                            fontSize: 28,
+                            fontWeight: FontWeight.w800,
+                            color: _scoreColor(stats.score),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Container(
+                    width: 1,
+                    height: 40,
+                    color: Colors.grey.shade200,
+                  ),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          "Shifts evaluated",
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: Colors.grey.shade600,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          stats.shiftsEvaluated.toString(),
+                          style: TextStyle(
+                            fontSize: 20,
+                            fontWeight: FontWeight.w700,
+                            color: Colors.grey.shade900,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
               ),
+              const SizedBox(height: 12),
+              const Divider(height: 1),
+              const SizedBox(height: 8),
+              if (settings.trackLate)
+                _kvRow("Late clock-ins", stats.lateCount.toString(), Icons.access_time),
+              if (settings.trackEarlyLeave)
+                _kvRow("Early leaves", stats.earlyLeaveCount.toString(), Icons.exit_to_app),
+              if (settings.trackNoShow)
+                _kvRow("No-shows", stats.noShowCount.toString(), Icons.event_busy),
             ],
-          ),
-          const SizedBox(height: 8),
-          if (settings.trackLate)
-            _kvRow("Late clock-ins", stats.lateCount.toString()),
-          if (settings.trackEarlyLeave)
-            _kvRow("Early leaves", stats.earlyLeaveCount.toString()),
-          if (settings.trackNoShow)
-            _kvRow("No-shows / missed shifts", stats.noShowCount.toString()),
-          _kvRow("Shifts evaluated", stats.shiftsEvaluated.toString()),
-        ],
-      ],
+          ],
+        ),
+      ),
     );
   }
 
-  Widget _kvRow(String label, String value) {
+  Widget _kvRow(String label, String value, [IconData? icon]) {
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 2),
+      padding: const EdgeInsets.symmetric(vertical: 4),
       child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(label),
-          Text(value),
+          if (icon != null) ...[
+            Icon(icon, size: 16, color: Colors.grey.shade500),
+            const SizedBox(width: 8),
+          ],
+          Expanded(
+            child: Text(
+              label,
+              style: TextStyle(fontSize: 14, color: Colors.grey.shade700),
+            ),
+          ),
+          Text(
+            value,
+            style: const TextStyle(fontWeight: FontWeight.w600),
+          ),
         ],
       ),
     );
