@@ -17,24 +17,31 @@ class BulkImportHubScreen extends StatelessWidget {
         children: [
           Card(
             child: ListTile(
-              leading: const Icon(Icons.people_outline),
-              title: const Text("Import Employees"),
+              leading: const Icon(Icons.people_outline, size: 24),
+              title: const Text(
+                "Import Employees",
+                style: TextStyle(fontWeight: FontWeight.w600),
+              ),
               subtitle: const Text("From a CSV of email, role, hourly_rate"),
-              trailing: const Icon(Icons.chevron_right),
+              trailing: const Icon(Icons.chevron_right, size: 20),
               onTap: () => Navigator.push(
                 context,
                 MaterialPageRoute(builder: (_) => const BulkImportScreen()),
               ),
             ),
           ),
+          const SizedBox(height: 8),
           Card(
             child: ListTile(
-              leading: const Icon(Icons.calendar_month_outlined),
-              title: const Text("Import Shifts"),
+              leading: const Icon(Icons.calendar_month_outlined, size: 24),
+              title: const Text(
+                "Import Shifts",
+                style: TextStyle(fontWeight: FontWeight.w600),
+              ),
               subtitle: const Text(
                 "From a CSV of employee_email, start_time, end_time",
               ),
-              trailing: const Icon(Icons.chevron_right),
+              trailing: const Icon(Icons.chevron_right, size: 20),
               onTap: () => Navigator.push(
                 context,
                 MaterialPageRoute(

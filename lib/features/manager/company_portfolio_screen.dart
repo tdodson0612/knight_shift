@@ -160,16 +160,24 @@ class _CompanyPortfolioScreenState extends State<CompanyPortfolioScreen> {
       appBar: AppBar(
         title: const Text("My Companies"),
         actions: [
-          IconButton(icon: const Icon(Icons.refresh), onPressed: _load),
+          IconButton(
+            icon: const Icon(Icons.refresh_outlined),
+            tooltip: "Refresh",
+            onPressed: _load,
+          ),
         ],
       ),
       body: loading
           ? const Center(child: CircularProgressIndicator())
           : companies.isEmpty
               ? const Center(
-                  child: Text(
-                    "You don't manage any companies yet",
-                    style: TextStyle(color: Colors.grey),
+                  child: Padding(
+                    padding: EdgeInsets.all(24),
+                    child: Text(
+                      "You don't manage any companies yet",
+                      style: TextStyle(color: Colors.grey),
+                      textAlign: TextAlign.center,
+                    ),
                   ),
                 )
               : ListView.builder(
@@ -183,7 +191,7 @@ class _CompanyPortfolioScreenState extends State<CompanyPortfolioScreen> {
                     return Card(
                       margin: const EdgeInsets.only(bottom: 8),
                       shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(8),
+                        borderRadius: BorderRadius.circular(12),
                         side: isCurrent
                             ? const BorderSide(color: Colors.blue, width: 2)
                             : BorderSide.none,
@@ -196,15 +204,27 @@ class _CompanyPortfolioScreenState extends State<CompanyPortfolioScreen> {
                               child: Text(
                                 s.companyName,
                                 style: const TextStyle(
-                                    fontWeight: FontWeight.bold),
+                                    fontWeight: FontWeight.w700),
                               ),
                             ),
                             if (isCurrent)
-                              const Chip(
-                                label:
-                                    Text("Current", style: TextStyle(fontSize: 11)),
-                                visualDensity: VisualDensity.compact,
-                                padding: EdgeInsets.zero,
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 8,
+                                  vertical: 2,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: Colors.blue.withValues(alpha: 0.15),
+                                  borderRadius: BorderRadius.circular(4),
+                                ),
+                                child: Text(
+                                  "Current",
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w600,
+                                    color: Colors.blue.shade700,
+                                  ),
+                                ),
                               ),
                           ],
                         ),

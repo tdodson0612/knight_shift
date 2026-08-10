@@ -114,44 +114,68 @@ class _SwapRequestsScreenState extends State<SwapRequestsScreen> {
       appBar: AppBar(
         title: const Text("Swap Requests"),
         actions: [
-          IconButton(icon: const Icon(Icons.refresh), onPressed: _load),
+          IconButton(
+            icon: const Icon(Icons.refresh_outlined),
+            tooltip: "Refresh",
+            onPressed: _load,
+          ),
         ],
       ),
       body: loading
           ? const Center(child: CircularProgressIndicator())
           : incoming.isEmpty
-              ? const Center(child: Text("No incoming swap requests"))
-              : ListView.builder(
-                  itemCount: incoming.length,
-                  itemBuilder: (context, i) {
-                    final shift = incoming[i];
-                    return Card(
-                      margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                      child: ListTile(
-                        title: Text(
-                          "${_nameFor(shift.userId)} wants to swap",
+              ? Center(
+                  child: Padding(
+                    padding: const EdgeInsets.all(24),
+                    child: Column(
+                      children: [
+                        Icon(Icons.swap_horiz_outlined, size: 48, color: Colors.grey.shade300),
+                        const SizedBox(height: 16),
+                        Text(
+                          "No incoming swap requests",
+                          style: TextStyle(fontSize: 16, color: Colors.grey.shade600),
                         ),
-                        subtitle: Text(
-                          "${_formatDateTime(shift.startTime)} – ${_formatDateTime(shift.endTime)}",
+                      ],
+                    ),
+                  ),
+                )
+              : RefreshIndicator(
+                  onRefresh: _load,
+                  child: ListView.builder(
+                    padding: const EdgeInsets.all(16),
+                    itemCount: incoming.length,
+                    itemBuilder: (context, i) {
+                      final shift = incoming[i];
+                      return Card(
+                        margin: const EdgeInsets.only(bottom: 8),
+                        child: ListTile(
+                          title: Text(
+                            "${_nameFor(shift.userId)} wants to swap",
+                            style: const TextStyle(fontWeight: FontWeight.w600),
+                          ),
+                          subtitle: Text(
+                            "${_formatDateTime(shift.startTime)} – ${_formatDateTime(shift.endTime)}",
+                            style: TextStyle(fontSize: 13, color: Colors.grey.shade600),
+                          ),
+                          trailing: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              IconButton(
+                                icon: const Icon(Icons.close_outlined, color: Colors.red),
+                                tooltip: "Decline",
+                                onPressed: () => _respond(shift, false),
+                              ),
+                              IconButton(
+                                icon: const Icon(Icons.check_outlined, color: Colors.green),
+                                tooltip: "Accept",
+                                onPressed: () => _respond(shift, true),
+                              ),
+                            ],
+                          ),
                         ),
-                        trailing: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            IconButton(
-                              icon: const Icon(Icons.close, color: Colors.red),
-                              tooltip: "Decline",
-                              onPressed: () => _respond(shift, false),
-                            ),
-                            IconButton(
-                              icon: const Icon(Icons.check, color: Colors.green),
-                              tooltip: "Accept",
-                              onPressed: () => _respond(shift, true),
-                            ),
-                          ],
-                        ),
-                      ),
-                    );
-                  },
+                      );
+                    },
+                  ),
                 ),
     );
   }

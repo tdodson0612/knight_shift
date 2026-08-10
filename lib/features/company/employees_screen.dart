@@ -65,32 +65,62 @@ class _EmployeesScreenState extends State<EmployeesScreen> {
         title: const Text("Employees"),
         actions: [
           IconButton(
+            icon: const Icon(Icons.refresh_outlined),
+            tooltip: "Refresh",
             onPressed: load,
-            icon: const Icon(Icons.refresh),
           )
         ],
       ),
       body: loading
           ? const Center(child: CircularProgressIndicator())
           : employees.isEmpty
-              ? const Center(
-                  child: Text("No employees found"),
+              ? Center(
+                  child: Padding(
+                    padding: const EdgeInsets.all(24),
+                    child: Column(
+                      children: [
+                        Icon(Icons.people_outline, size: 48, color: Colors.grey.shade300),
+                        const SizedBox(height: 16),
+                        Text(
+                          "No employees found",
+                          style: TextStyle(fontSize: 16, color: Colors.grey.shade600),
+                        ),
+                      ],
+                    ),
+                  ),
                 )
               : ListView.builder(
+                  padding: const EdgeInsets.all(16),
                   itemCount: employees.length,
                   itemBuilder: (context, index) {
                     final e = employees[index];
-                    return ListTile(
-                      leading: CircleAvatar(
-                        child: Text(e.initials),
+                    return Card(
+                      margin: const EdgeInsets.only(bottom: 8),
+                      child: ListTile(
+                        leading: CircleAvatar(
+                          backgroundColor: Colors.teal.shade50,
+                          child: Text(
+                            e.initials,
+                            style: TextStyle(
+                              color: Colors.teal.shade800,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                        title: Text(
+                          e.displayName,
+                          style: const TextStyle(fontWeight: FontWeight.w600),
+                        ),
+                        subtitle: Text(
+                          e.role,
+                          style: TextStyle(fontSize: 13, color: Colors.grey.shade600),
+                        ),
+                        trailing: Text(
+                          e.email.isEmpty ? "—" : e.email,
+                          style: TextStyle(fontSize: 12, color: Colors.grey.shade500),
+                        ),
+                        onTap: () => _openProfile(e),
                       ),
-                      title: Text(e.displayName),
-                      subtitle: Text(e.role),
-                      trailing: Text(
-                        e.email.isEmpty ? "—" : e.email,
-                        style: const TextStyle(fontSize: 12),
-                      ),
-                      onTap: () => _openProfile(e),
                     );
                   },
                 ),

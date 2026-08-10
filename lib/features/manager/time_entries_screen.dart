@@ -112,15 +112,24 @@ class _TimeEntriesScreenState extends State<TimeEntriesScreen> {
       appBar: AppBar(
         title: const Text("Time Entries"),
         actions: [
-          IconButton(icon: const Icon(Icons.refresh), onPressed: _load),
+          IconButton(
+            icon: const Icon(Icons.refresh_outlined),
+            tooltip: "Refresh",
+            onPressed: _load,
+          ),
         ],
       ),
       body: loading
           ? const Center(child: CircularProgressIndicator())
           : entries.isEmpty
               ? const Center(
-                  child: Text("No punches in this period",
-                      style: TextStyle(color: Colors.grey)),
+                  child: Padding(
+                    padding: EdgeInsets.all(24),
+                    child: Text(
+                      "No punches in this period",
+                      style: TextStyle(color: Colors.grey),
+                    ),
+                  ),
                 )
               : RefreshIndicator(
                   onRefresh: _load,
@@ -134,12 +143,16 @@ class _TimeEntriesScreenState extends State<TimeEntriesScreen> {
                         child: ListTile(
                           onTap: () => _openEntry(e),
                           leading: Icon(
-                            e.isOpen ? Icons.timer : Icons.check_circle_outline,
+                            e.isOpen ? Icons.timer_outlined : Icons.check_circle_outline,
                             color: e.isOpen ? Colors.orange : null,
                           ),
-                          title: Text(_nameFor(e.userId)),
+                          title: Text(
+                            _nameFor(e.userId),
+                            style: const TextStyle(fontWeight: FontWeight.w600),
+                          ),
                           subtitle: Text(
                             "In: ${_fmt(e.clockIn)}  •  Out: ${_fmt(e.clockOut)}",
+                            style: TextStyle(fontSize: 13, color: Colors.grey.shade600),
                           ),
                           trailing: Row(
                             mainAxisSize: MainAxisSize.min,
@@ -150,7 +163,7 @@ class _TimeEntriesScreenState extends State<TimeEntriesScreen> {
                                   tooltip: "View clock-in photo",
                                   onPressed: () => _viewPhoto(e.clockInPhotoPath!),
                                 ),
-                              const Icon(Icons.chevron_right),
+                              const Icon(Icons.chevron_right, size: 20),
                             ],
                           ),
                         ),

@@ -122,6 +122,8 @@ class _IncidentReportSubmitScreenState
     );
   }
 
+  String _formatDate(DateTime d) => "${d.month}/${d.day}/${d.year}";
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -135,16 +137,24 @@ class _IncidentReportSubmitScreenState
                     child: Text(
                       "Incident reporting isn't enabled for this company.",
                       textAlign: TextAlign.center,
+                      style: TextStyle(fontSize: 15),
                     ),
                   ),
                 )
               : ListView(
                   padding: const EdgeInsets.all(16),
                   children: [
-                    const Text(
-                      "This goes directly to your manager. It is not "
-                      "visible to other coworkers.",
-                      style: TextStyle(fontSize: 12, color: Colors.grey),
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: Colors.blue.withValues(alpha: 0.08),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: const Text(
+                        "This goes directly to your manager. It is not "
+                        "visible to other coworkers.",
+                        style: TextStyle(fontSize: 12),
+                      ),
                     ),
                     const SizedBox(height: 16),
 
@@ -153,6 +163,7 @@ class _IncidentReportSubmitScreenState
                       decoration: const InputDecoration(
                         labelText: "About (optional)",
                         border: OutlineInputBorder(),
+                        prefixIcon: Icon(Icons.person_outline),
                       ),
                       items: [
                         const DropdownMenuItem<String>(
@@ -174,9 +185,9 @@ class _IncidentReportSubmitScreenState
                       title: Text(
                         incidentDate == null
                             ? "Date it happened (optional)"
-                            : "${incidentDate!.month}/${incidentDate!.day}/${incidentDate!.year}",
+                            : _formatDate(incidentDate!),
                       ),
-                      trailing: const Icon(Icons.calendar_today, size: 18),
+                      trailing: const Icon(Icons.calendar_today_outlined, size: 20),
                       onTap: _pickDate,
                     ),
                     const SizedBox(height: 12),
@@ -210,9 +221,13 @@ class _IncidentReportSubmitScreenState
                     const SizedBox(height: 20),
                     SizedBox(
                       width: double.infinity,
+                      height: 50,
                       child: ElevatedButton(
                         onPressed: submitting ? null : _submit,
-                        child: Text(submitting ? "Submitting..." : "Submit Report"),
+                        child: Text(
+                          submitting ? "Submitting..." : "Submit Report",
+                          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+                        ),
                       ),
                     ),
                   ],

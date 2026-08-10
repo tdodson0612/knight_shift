@@ -120,18 +120,37 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
         title: const Text("Notifications"),
         actions: [
           IconButton(
-            icon: const Icon(Icons.done_all),
+            icon: const Icon(Icons.done_all_outlined),
             tooltip: "Mark all as read",
             onPressed: _markAllRead,
           ),
-          IconButton(icon: const Icon(Icons.refresh), onPressed: _load),
+          IconButton(
+            icon: const Icon(Icons.refresh_outlined),
+            tooltip: "Refresh",
+            onPressed: _load,
+          ),
         ],
       ),
       body: loading
           ? const Center(child: CircularProgressIndicator())
           : notifications.isEmpty
-              ? const Center(child: Text("No notifications yet"))
+              ? Center(
+                  child: Padding(
+                    padding: const EdgeInsets.all(24),
+                    child: Column(
+                      children: [
+                        Icon(Icons.notifications_none_outlined, size: 48, color: Colors.grey.shade300),
+                        const SizedBox(height: 16),
+                        Text(
+                          "No notifications yet",
+                          style: TextStyle(fontSize: 16, color: Colors.grey.shade600),
+                        ),
+                      ],
+                    ),
+                  ),
+                )
               : ListView.builder(
+                  padding: const EdgeInsets.all(16),
                   itemCount: notifications.length,
                   itemBuilder: (context, i) {
                     final n = notifications[i];
@@ -140,28 +159,28 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                       return _swapRequestTile(n);
                     }
 
-                    return ListTile(
-                      tileColor: n.isUnread
-                          ? Colors.blue.withValues(alpha: 0.06)
-                          : null,
-                      leading: Icon(
-                        n.isUnread ? Icons.circle : Icons.circle_outlined,
-                        size: 10,
-                        color: n.isUnread ? Colors.blue : Colors.grey,
-                      ),
-                      title: Text(
-                        n.title,
-                        style: TextStyle(
-                          fontWeight:
-                              n.isUnread ? FontWeight.bold : FontWeight.normal,
+                    return Card(
+                      margin: const EdgeInsets.only(bottom: 8),
+                      color: n.isUnread ? Colors.blue.withValues(alpha: 0.04) : null,
+                      child: ListTile(
+                        leading: Icon(
+                          n.isUnread ? Icons.circle : Icons.circle_outlined,
+                          size: 10,
+                          color: n.isUnread ? Colors.blue : Colors.grey,
                         ),
+                        title: Text(
+                          n.title,
+                          style: TextStyle(
+                            fontWeight: n.isUnread ? FontWeight.w600 : FontWeight.normal,
+                          ),
+                        ),
+                        subtitle: n.body != null ? Text(n.body!) : null,
+                        trailing: Text(
+                          _timeAgo(n.createdAt),
+                          style: const TextStyle(fontSize: 11, color: Colors.grey),
+                        ),
+                        onTap: () => _tap(n),
                       ),
-                      subtitle: n.body != null ? Text(n.body!) : null,
-                      trailing: Text(
-                        _timeAgo(n.createdAt),
-                        style: const TextStyle(fontSize: 11, color: Colors.grey),
-                      ),
-                      onTap: () => _tap(n),
                     );
                   },
                 ),

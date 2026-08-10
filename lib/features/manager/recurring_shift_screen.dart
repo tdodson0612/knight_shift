@@ -192,6 +192,7 @@ class _RecurringShiftScreenState extends State<RecurringShiftScreen> {
                   decoration: const InputDecoration(
                     labelText: "Employee",
                     border: OutlineInputBorder(),
+                    prefixIcon: Icon(Icons.person_outline),
                   ),
                   items: employees
                       .map((e) => DropdownMenuItem(
@@ -205,9 +206,9 @@ class _RecurringShiftScreenState extends State<RecurringShiftScreen> {
                 const SizedBox(height: 16),
                 const Text(
                   "Days of the week",
-                  style: TextStyle(fontWeight: FontWeight.bold),
+                  style: TextStyle(fontWeight: FontWeight.w600),
                 ),
-                const SizedBox(height: 4),
+                const SizedBox(height: 8),
                 Wrap(
                   spacing: 8,
                   children: List.generate(7, (i) {
@@ -228,37 +229,53 @@ class _RecurringShiftScreenState extends State<RecurringShiftScreen> {
                 ),
 
                 const SizedBox(height: 16),
-                ListTile(
-                  contentPadding: EdgeInsets.zero,
-                  title: const Text("Start time"),
-                  trailing: Text(_fmtTime(startTime)),
-                  onTap: _pickStartTime,
-                ),
-                ListTile(
-                  contentPadding: EdgeInsets.zero,
-                  title: const Text("End time"),
-                  trailing: Text(_fmtTime(endTime)),
-                  onTap: _pickEndTime,
-                ),
-                ListTile(
-                  contentPadding: EdgeInsets.zero,
-                  title: const Text("Start date"),
-                  trailing: Text(_fmtDate(startDate)),
-                  onTap: _pickStartDate,
-                ),
-                ListTile(
-                  contentPadding: EdgeInsets.zero,
-                  title: const Text("End date"),
-                  trailing: Text(_fmtDate(endDate)),
-                  onTap: _pickEndDate,
+                Card(
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 12),
+                    child: Column(
+                      children: [
+                        ListTile(
+                          contentPadding: EdgeInsets.zero,
+                          title: const Text("Start time"),
+                          trailing: Text(_fmtTime(startTime)),
+                          onTap: _pickStartTime,
+                        ),
+                        const Divider(height: 1),
+                        ListTile(
+                          contentPadding: EdgeInsets.zero,
+                          title: const Text("End time"),
+                          trailing: Text(_fmtTime(endTime)),
+                          onTap: _pickEndTime,
+                        ),
+                        const Divider(height: 1),
+                        ListTile(
+                          contentPadding: EdgeInsets.zero,
+                          title: const Text("Start date"),
+                          trailing: Text(_fmtDate(startDate)),
+                          onTap: _pickStartDate,
+                        ),
+                        const Divider(height: 1),
+                        ListTile(
+                          contentPadding: EdgeInsets.zero,
+                          title: const Text("End date"),
+                          trailing: Text(_fmtDate(endDate)),
+                          onTap: _pickEndDate,
+                        ),
+                      ],
+                    ),
+                  ),
                 ),
 
                 const SizedBox(height: 24),
                 SizedBox(
                   width: double.infinity,
+                  height: 50,
                   child: ElevatedButton(
                     onPressed: generating ? null : _generate,
-                    child: Text(generating ? "Generating..." : "Generate Shifts"),
+                    child: Text(
+                      generating ? "Generating..." : "Generate Shifts",
+                      style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+                    ),
                   ),
                 ),
               ],

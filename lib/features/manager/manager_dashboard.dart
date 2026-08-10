@@ -31,6 +31,18 @@ import 'time_off_requests_screen.dart';
 import '../notifications/notifications_screen.dart';
 import '../billing/billing_screen.dart';
 
+enum _DashboardAction {
+  invites,
+  incidents,
+  timeEntries,
+  bulkImport,
+  companies,
+  timeOff,
+  billing,
+  settings,
+  refresh,
+}
+
 class ManagerDashboard extends StatefulWidget {
   const ManagerDashboard({super.key});
 
@@ -361,31 +373,6 @@ class _ManagerDashboardState extends State<ManagerDashboard> {
             onPressed: _openNotifications,
           ),
           IconButton(
-            icon: const Icon(Icons.mail_outline),
-            tooltip: "Manage Invites",
-            onPressed: _openManageInvites,
-          ),
-          IconButton(
-            icon: const Icon(Icons.report_outlined),
-            tooltip: "Incident Reports",
-            onPressed: _openIncidentReports,
-          ),
-          IconButton(
-            icon: const Icon(Icons.punch_clock_outlined),
-            tooltip: "Time Entries",
-            onPressed: _openTimeEntries,
-          ),
-          IconButton(
-            icon: const Icon(Icons.upload_file_outlined),
-            tooltip: "Bulk Import Employees",
-            onPressed: _openBulkImport,
-          ),
-          IconButton(
-            icon: const Icon(Icons.apartment_outlined),
-            tooltip: "My Companies",
-            onPressed: _openCompanyPortfolio,
-          ),
-          IconButton(
             icon: const Icon(Icons.people),
             tooltip: "Employees",
             onPressed: _openEmployees,
@@ -394,11 +381,6 @@ class _ManagerDashboardState extends State<ManagerDashboard> {
             icon: const Icon(Icons.calendar_month),
             tooltip: "Scheduling",
             onPressed: _openScheduling,
-          ),
-          IconButton(
-            icon: const Icon(Icons.beach_access),
-            tooltip: "Time Off Requests",
-            onPressed: _openTimeOffRequests,
           ),
           IconButton(
             icon: const Icon(Icons.payments),
@@ -410,19 +392,123 @@ class _ManagerDashboardState extends State<ManagerDashboard> {
             tooltip: "Reports",
             onPressed: _openReports,
           ),
-          IconButton(
-            icon: const Icon(Icons.credit_card),
-            tooltip: "Billing",
-            onPressed: _openBilling,
-          ),
-          IconButton(
-            icon: const Icon(Icons.settings),
-            tooltip: "Settings",
-            onPressed: _openSettings,
-          ),
-          IconButton(
-            icon: const Icon(Icons.refresh),
-            onPressed: load,
+          PopupMenuButton<_DashboardAction>(
+            icon: const Icon(Icons.more_vert),
+            tooltip: "More",
+            itemBuilder: (context) => [
+              const PopupMenuItem(
+                value: _DashboardAction.invites,
+                child: Row(
+                  children: [
+                    Icon(Icons.mail_outline, size: 20),
+                    SizedBox(width: 12),
+                    Text("Manage Invites"),
+                  ],
+                ),
+              ),
+              const PopupMenuItem(
+                value: _DashboardAction.incidents,
+                child: Row(
+                  children: [
+                    Icon(Icons.report_outlined, size: 20),
+                    SizedBox(width: 12),
+                    Text("Incident Reports"),
+                  ],
+                ),
+              ),
+              const PopupMenuItem(
+                value: _DashboardAction.timeEntries,
+                child: Row(
+                  children: [
+                    Icon(Icons.punch_clock_outlined, size: 20),
+                    SizedBox(width: 12),
+                    Text("Time Entries"),
+                  ],
+                ),
+              ),
+              const PopupMenuItem(
+                value: _DashboardAction.bulkImport,
+                child: Row(
+                  children: [
+                    Icon(Icons.upload_file_outlined, size: 20),
+                    SizedBox(width: 12),
+                    Text("Bulk Import"),
+                  ],
+                ),
+              ),
+              const PopupMenuItem(
+                value: _DashboardAction.companies,
+                child: Row(
+                  children: [
+                    Icon(Icons.apartment_outlined, size: 20),
+                    SizedBox(width: 12),
+                    Text("My Companies"),
+                  ],
+                ),
+              ),
+              const PopupMenuItem(
+                value: _DashboardAction.timeOff,
+                child: Row(
+                  children: [
+                    Icon(Icons.beach_access, size: 20),
+                    SizedBox(width: 12),
+                    Text("Time Off Requests"),
+                  ],
+                ),
+              ),
+              const PopupMenuItem(
+                value: _DashboardAction.billing,
+                child: Row(
+                  children: [
+                    Icon(Icons.credit_card, size: 20),
+                    SizedBox(width: 12),
+                    Text("Billing"),
+                  ],
+                ),
+              ),
+              const PopupMenuItem(
+                value: _DashboardAction.settings,
+                child: Row(
+                  children: [
+                    Icon(Icons.settings_outlined, size: 20),
+                    SizedBox(width: 12),
+                    Text("Settings"),
+                  ],
+                ),
+              ),
+              const PopupMenuItem(
+                value: _DashboardAction.refresh,
+                child: Row(
+                  children: [
+                    Icon(Icons.refresh_outlined, size: 20),
+                    SizedBox(width: 12),
+                    Text("Refresh"),
+                  ],
+                ),
+              ),
+            ],
+            onSelected: (action) {
+              switch (action) {
+                case _DashboardAction.invites:
+                  _openManageInvites();
+                case _DashboardAction.incidents:
+                  _openIncidentReports();
+                case _DashboardAction.timeEntries:
+                  _openTimeEntries();
+                case _DashboardAction.bulkImport:
+                  _openBulkImport();
+                case _DashboardAction.companies:
+                  _openCompanyPortfolio();
+                case _DashboardAction.timeOff:
+                  _openTimeOffRequests();
+                case _DashboardAction.billing:
+                  _openBilling();
+                case _DashboardAction.settings:
+                  _openSettings();
+                case _DashboardAction.refresh:
+                  load();
+              }
+            },
           ),
         ],
       ),

@@ -153,7 +153,8 @@ class _ReportsScreenState extends State<ReportsScreen> {
         title: const Text("Reports"),
         actions: [
           IconButton(
-            icon: const Icon(Icons.refresh),
+            icon: const Icon(Icons.refresh_outlined),
+            tooltip: "Refresh",
             onPressed: _load,
           ),
         ],
@@ -161,20 +162,35 @@ class _ReportsScreenState extends State<ReportsScreen> {
       body: loading
           ? const Center(child: CircularProgressIndicator())
           : error != null
-              ? Center(child: Text(error!))
+              ? Center(
+                  child: Padding(
+                    padding: const EdgeInsets.all(24),
+                    child: Column(
+                      children: [
+                        Icon(Icons.error_outline, size: 48, color: Colors.red.shade300),
+                        const SizedBox(height: 16),
+                        Text(
+                          error!,
+                          style: TextStyle(color: Colors.red.shade700),
+                          textAlign: TextAlign.center,
+                        ),
+                      ],
+                    ),
+                  ),
+                )
               : ListView(
                   padding: const EdgeInsets.all(16),
                   children: [
                     _laborSection(),
-                    const SizedBox(height: 32),
+                    const SizedBox(height: 24),
                     _payrollSection(),
-                    const SizedBox(height: 32),
+                    const SizedBox(height: 24),
                     _teamInsightsSection(),
                     if (reliabilitySettings?.enabled == true) ...[
-                      const SizedBox(height: 32),
+                      const SizedBox(height: 24),
                       _reliabilitySection(),
                     ],
-                    const SizedBox(height: 32),
+                    const SizedBox(height: 24),
                     _forecastingSection(),
                   ],
                 ),

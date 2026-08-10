@@ -177,22 +177,42 @@ class _TimeOffScreenState extends State<TimeOffScreen> {
       appBar: AppBar(
         title: const Text("Time Off"),
         actions: [
-          IconButton(icon: const Icon(Icons.refresh), onPressed: _load),
+          IconButton(
+            icon: const Icon(Icons.refresh_outlined),
+            tooltip: "Refresh",
+            onPressed: _load,
+          ),
         ],
       ),
       body: loading
           ? const Center(child: CircularProgressIndicator())
           : requests.isEmpty
-              ? const Center(child: Text("No time off requests yet"))
+              ? Center(
+                  child: Padding(
+                    padding: const EdgeInsets.all(24),
+                    child: Column(
+                      children: [
+                        Icon(Icons.event_busy_outlined, size: 48, color: Colors.grey.shade300),
+                        const SizedBox(height: 16),
+                        Text(
+                          "No time off requests yet",
+                          style: TextStyle(fontSize: 16, color: Colors.grey.shade600),
+                        ),
+                      ],
+                    ),
+                  ),
+                )
               : ListView.builder(
+                  padding: const EdgeInsets.all(16),
                   itemCount: requests.length,
                   itemBuilder: (context, i) {
                     final r = requests[i];
                     return Card(
-                      margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                      margin: const EdgeInsets.only(bottom: 8),
                       child: ListTile(
                         title: Text(
                           "${_formatDate(r.startDate)} → ${_formatDate(r.endDate)}",
+                          style: const TextStyle(fontWeight: FontWeight.w600),
                         ),
                         subtitle: r.reason != null && r.reason!.isNotEmpty
                             ? Text(r.reason!)
@@ -210,7 +230,7 @@ class _TimeOffScreenState extends State<TimeOffScreen> {
                 ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: _requestDialog,
-        icon: const Icon(Icons.add),
+        icon: const Icon(Icons.add_outlined),
         label: const Text("Request Time Off"),
       ),
     );

@@ -120,34 +120,73 @@ class _CompanySelectionScreenState extends State<CompanySelectionScreen> {
           : Column(
               children: [
                 Expanded(
-                  child: ListView.builder(
-                    itemCount: companies.length,
-                    itemBuilder: (_, i) {
-                      final c = companies[i];
-                      final name =
-                          c['companies']?['name']?.toString() ?? 'Unnamed';
-                      final role =
-                          c['role']?.toString() ?? 'employee';
+                  child: companies.isEmpty
+                      ? Center(
+                          child: Padding(
+                            padding: const EdgeInsets.all(24),
+                            child: Column(
+                              children: [
+                                Icon(Icons.business_outlined, size: 48, color: Colors.grey.shade300),
+                                const SizedBox(height: 16),
+                                Text(
+                                  "No companies yet",
+                                  style: TextStyle(fontSize: 16, color: Colors.grey.shade600),
+                                ),
+                                const SizedBox(height: 8),
+                                Text(
+                                  "Create your first company below to get started",
+                                  style: TextStyle(fontSize: 13, color: Colors.grey.shade500),
+                                  textAlign: TextAlign.center,
+                                ),
+                              ],
+                            ),
+                          ),
+                        )
+                      : ListView.builder(
+                          padding: const EdgeInsets.all(16),
+                          itemCount: companies.length,
+                          itemBuilder: (_, i) {
+                            final c = companies[i];
+                            final name =
+                                c['companies']?['name']?.toString() ?? 'Unnamed';
+                            final role =
+                                c['role']?.toString() ?? 'employee';
 
-                      return ListTile(
-                        leading: const Icon(Icons.business),
-                        title: Text(name),
-                        subtitle: Text("Role: $role"),
-                        trailing: const Icon(Icons.arrow_forward_ios),
-                        onTap: () => _enter(c),
-                      );
-                    },
-                  ),
+                            return Card(
+                              margin: const EdgeInsets.only(bottom: 8),
+                              child: ListTile(
+                                leading: const Icon(Icons.business_outlined, size: 24),
+                                title: Text(
+                                  name,
+                                  style: const TextStyle(fontWeight: FontWeight.w600),
+                                ),
+                                subtitle: Text(
+                                  "Role: $role",
+                                  style: TextStyle(fontSize: 13, color: Colors.grey.shade600),
+                                ),
+                                trailing: const Icon(Icons.arrow_forward_ios, size: 16),
+                                onTap: () => _enter(c),
+                              ),
+                            );
+                          },
+                        ),
                 ),
-                Padding(
-                  padding: const EdgeInsets.all(12),
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    border: Border(top: BorderSide(color: Colors.grey.shade200)),
+                  ),
                   child: Column(
                     children: [
                       TextField(
                         controller: controller,
-                        decoration: const InputDecoration(
+                        decoration: InputDecoration(
                           labelText: "New Company",
-                          border: OutlineInputBorder(),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          prefixIcon: const Icon(Icons.add_business_outlined),
                         ),
                       ),
                       const SizedBox(height: 10),
@@ -155,7 +194,7 @@ class _CompanySelectionScreenState extends State<CompanySelectionScreen> {
                         width: double.infinity,
                         child: ElevatedButton(
                           onPressed: _createCompany,
-                          child: const Text("Create"),
+                          child: const Text("Create Company"),
                         ),
                       ),
                     ],
