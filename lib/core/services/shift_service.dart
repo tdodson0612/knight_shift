@@ -622,33 +622,13 @@ class ShiftService {
     int created = 0;
     int skipped = 0;
 
-    // Iterate day by day over the inclusive range.
-    for (var day = DateTime(startDate.year, startDate.month, startDate.day);
-        !day.isAfter(endDate);
-        day = day.add(const Duration(days: 1))) {
-      if (!daysOfWeek.contains(day.weekday)) continue;
-
-      final start = DateTime(
-        day.year,
-        day.month,
-        day.day,
-        startTime.hour,
-        startTime.minute,
-      );
-      final end = DateTime(
-        day.year,
-        day.month,
-        day.day,
-        endTime.hour,
-        endTime.minute,
-      );
-
+    for (final day in datesForRecurrence(startDate, endDate, daysOfWeek)) {
       try {
         await createShift(
           companyId: companyId,
           userId: userId,
-          start: start,
-          end: end,
+          start: DateTime(day.year, day.month, day.day, startTime.hour, startTime.minute),
+          end: DateTime(day.year, day.month, day.day, endTime.hour, endTime.minute),
           createdBy: createdBy,
           status: 'approved',
           origin: 'manager_scheduled',
@@ -656,13 +636,27 @@ class ShiftService {
         );
         created++;
       } catch (_) {
-        // Per-occurrence conflict/validation failure — skip just this
-        // day, keep going with the rest of the pattern.
         skipped++;
       }
     }
 
     return (created: created, skipped: skipped);
+  }
+
+  static List<DateTime> datesForRecurrence(
+    DateTime startDate,
+    DateTime endDate,
+    Set<int> daysOfWeek,
+  ) {
+    final result = <DateTime>[];
+    for (var day = DateTime(startDate.year, startDate.month, startDate.day);
+        !day.isAfter(endDate);
+        day = day.add(const Duration(days: 1))) {
+      if (daysOfWeek.contains(day.weekday)) {
+        result.add(DateTime(day.year, day.month, day.day));
+      }
+    }
+    return result;
   }
 
   // ----------------------------
