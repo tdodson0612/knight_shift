@@ -17,6 +17,11 @@ import '../../core/services/shift_checklist_service.dart';
 import '../../core/services/clock_in_photo_service.dart';
 import '../../shared/models/shift_checklist_model.dart';
 import '../legal/legal_reference_screen.dart';
+import '../../core/services/labor_budget_service.dart';
+import '../../shared/models/labor_budget_settings_model.dart';
+import '../../core/services/employee_skill_service.dart';
+import '../../shared/models/employee_skill_model.dart';
+import '../../core/services/supabase_service.dart';
 import '../../shared/models/employee_profile.dart';
 import '../../shared/models/overtime_settings_model.dart';
 import '../../shared/models/reliability_settings_model.dart';
@@ -65,6 +70,21 @@ class _SettingsScreenState extends State<SettingsScreen> {
   bool locatingNow = false;
   late final TextEditingController _radiusController;
 
+  // Manager-only labor budget state.
+  LaborBudgetSettings? laborBudgetSettings;
+  bool savingLaborBudget = false;
+  late final TextEditingController _laborBudgetController;
+
+  // Manager-only skills state.
+  List<EmployeeSkill> skills = [];
+  bool skillsEnabled = false; // presence of the section is the "enabled" signal
+  bool savingSkills = false;
+  late final TextEditingController _newSkillController;
+
+  // Manager-only open-shift priority state.
+  String? openShiftPriority; // 'first_come' | 'seniority_first'
+  bool savingOpenShiftPriority = false;
+
   // Manager-only shift comments / checklist state.
   bool? shiftCommentsEnabled;
   bool? shiftChecklistsEnabled;
@@ -87,6 +107,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
     _weightEarlyController = TextEditingController();
     _weightNoShowController = TextEditingController();
     _radiusController = TextEditingController();
+    _laborBudgetController = TextEditingController();
+    _newSkillController = TextEditingController();
     _newChecklistItemController = TextEditingController();
     _load();
   }
@@ -103,6 +125,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
     _weightNoShowController.dispose();
     _radiusController.dispose();
     _newChecklistItemController.dispose();
+    _laborBudgetController.dispose();
+    _newSkillController.dispose();
     super.dispose();
   }
 
@@ -163,6 +187,33 @@ class _SettingsScreenState extends State<SettingsScreen> {
         clockInPhotoEnabled = await ClockInPhotoService.isRequired(companyId);
       } catch (_) {
         clockInPhotoEnabled = null;
+      }
+
+      try {
+        laborBudgetSettings = await LaborBudgetService.getSettings(companyId);
+        _laborBudgetController.text =
+            laborBudgetSettings!.amount.toStringAsFixed(2);
+      } catch (_) {
+        laborBudgetSettings = null;
+      }
+
+      try {
+        skills = await EmployeeSkillService.getSkills(companyId);
+        skillsEnabled = true;
+      } catch (_) {
+        skills = [];
+        skillsEnabled = false;
+      }
+
+      try {
+        final res = await SupabaseService.client
+            .from('companies')
+            .select('open_shift_priority')
+            .eq('id', companyId)
+            .single();
+        openShiftPriority = res['open_shift_priority']?.toString() ?? 'first_come';
+      } catch (_) {
+        openShiftPriority = null;
       }
     }
 
@@ -450,6 +501,89 @@ class _SettingsScreenState extends State<SettingsScreen> {
     }
   }
 
+  Future<void> _saveLaborBudgetSettings() async {
+    final companyId = SessionService.activeCompanyId;
+    final s = laborBudgetSettings;
+    if (companyId == null || s == null) return;
+
+    final amount = double.tryParse(_laborBudgetController.text.trim());
+    if (s.enabled && (amount == null || amount <= 0)) {
+      _error("Budget must be a positive dollar amount");
+      return;
+    }
+
+    final updated = s.copyWith(amount: amount ?? s.amount);
+
+    setState(() => savingLaborBudget = true);
+
+    try {
+      await LaborBudgetService.updateSettings(
+        companyId: companyId,
+        settings: updated,
+      );
+      if (!mounted) return;
+      setState(() => laborBudgetSettings = updated);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Labor budget saved")),
+      );
+    } catch (e) {
+      _error("Couldn't save labor budget: \$e");
+    } finally {
+      if (mounted) setState(() => savingLaborBudget = false);
+    }
+  }
+
+  Future<void> _addSkill() async {
+    final companyId = SessionService.activeCompanyId;
+    final label = _newSkillController.text.trim();
+    if (companyId == null || label.isEmpty) return;
+
+    setState(() => savingSkills = true);
+    try {
+      await EmployeeSkillService.addSkill(companyId: companyId, label: label);
+      _newSkillController.clear();
+      skills = await EmployeeSkillService.getSkills(companyId);
+    } catch (e) {
+      _error("Couldn't add skill: \$e");
+    } finally {
+      if (mounted) setState(() => savingSkills = false);
+    }
+  }
+
+  Future<void> _deleteSkill(EmployeeSkill skill) async {
+    final companyId = SessionService.activeCompanyId;
+    if (companyId == null) return;
+
+    try {
+      await EmployeeSkillService.deleteSkill(skill.id);
+      skills = await EmployeeSkillService.getSkills(companyId);
+      if (mounted) setState(() {});
+    } catch (e) {
+      _error("Couldn't remove skill: \$e");
+    }
+  }
+
+  Future<void> _saveOpenShiftPriority(String value) async {
+    final companyId = SessionService.activeCompanyId;
+    if (companyId == null) return;
+
+    setState(() {
+      openShiftPriority = value;
+      savingOpenShiftPriority = true;
+    });
+
+    try {
+      await SupabaseService.client
+          .from('companies')
+          .update({'open_shift_priority': value})
+          .eq('id', companyId);
+    } catch (e) {
+      _error("Couldn't save open-shift priority: \$e");
+    } finally {
+      if (mounted) setState(() => savingOpenShiftPriority = false);
+    }
+  }
+
   void _error(String message) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text(message), backgroundColor: Colors.red),
@@ -528,6 +662,21 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 if (isManager && clockInPhotoEnabled != null) ...[
                   const SizedBox(height: 24),
                   _clockInPhotoSection(),
+                ],
+
+                if (isManager && laborBudgetSettings != null) ...[
+                  const SizedBox(height: 24),
+                  _laborBudgetSection(),
+                ],
+
+                if (isManager && skillsEnabled) ...[
+                  const SizedBox(height: 24),
+                  _skillsSection(),
+                ],
+
+                if (isManager && openShiftPriority != null) ...[
+                  const SizedBox(height: 24),
+                  _openShiftPrioritySection(),
                 ],
 
                 const SizedBox(height: 24),
@@ -1034,6 +1183,177 @@ class _SettingsScreenState extends State<SettingsScreen> {
               value: clockInPhotoEnabled ?? false,
               onChanged: _toggleClockInPhoto,
             ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // ----------------------------
+  // LABOR BUDGET (manager-only)
+  // ----------------------------
+  Widget _laborBudgetSection() {
+    final s = laborBudgetSettings!;
+
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              "Labor Budget",
+              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+            ),
+            const SizedBox(height: 4),
+            const Text(
+              "Get a heads-up while scheduling if a week's projected "
+              "labor cost goes over budget. Advisory only — never "
+              "blocks a shift from being created.",
+              style: TextStyle(fontSize: 12, color: Colors.grey),
+            ),
+            const SizedBox(height: 12),
+            SwitchListTile(
+              contentPadding: EdgeInsets.zero,
+              title: const Text("Enable labor budget warnings"),
+              value: s.enabled,
+              onChanged: (v) =>
+                  setState(() => laborBudgetSettings = s.copyWith(enabled: v)),
+            ),
+            if (s.enabled) ...[
+              const Divider(),
+              _numberField(
+                controller: _laborBudgetController,
+                label: "Weekly labor budget (\$)",
+              ),
+            ],
+            const SizedBox(height: 8),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton(
+                onPressed: savingLaborBudget ? null : _saveLaborBudgetSettings,
+                child: Text(
+                    savingLaborBudget ? "Saving..." : "Save Labor Budget"),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // ----------------------------
+  // SKILLS (manager-only) — company-wide tag management. Assigning
+  // tags to individual employees happens on their profile screen,
+  // not here.
+  // ----------------------------
+  Widget _skillsSection() {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              "Skills",
+              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+            ),
+            const SizedBox(height: 4),
+            const Text(
+              "Tag skills like \"bartender\" or \"certified forklift\". "
+              "A shift can optionally require one — assigning someone "
+              "without it just warns, never blocks. Assign tags to "
+              "specific employees from their profile.",
+              style: TextStyle(fontSize: 12, color: Colors.grey),
+            ),
+            const SizedBox(height: 12),
+            ...skills.map((skill) => ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  dense: true,
+                  title: Text(skill.label, style: const TextStyle(fontSize: 13)),
+                  trailing: IconButton(
+                    icon: const Icon(Icons.close, size: 16),
+                    onPressed: () => _deleteSkill(skill),
+                  ),
+                )),
+            Row(
+              children: [
+                Expanded(
+                  child: TextField(
+                    controller: _newSkillController,
+                    decoration: const InputDecoration(
+                      hintText: "e.g. Certified bartender",
+                      isDense: true,
+                    ),
+                  ),
+                ),
+                IconButton(
+                  icon: const Icon(Icons.add),
+                  onPressed: savingSkills ? null : _addSkill,
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // ----------------------------
+  // OPEN-SHIFT PRIORITY (manager-only)
+  // ----------------------------
+  Widget _openShiftPrioritySection() {
+    final value = openShiftPriority ?? 'first_come';
+
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              "Open-Shift Claim Priority",
+              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+            ),
+            const SizedBox(height: 4),
+            const Text(
+              "Decides who gets an open shift when more than one "
+              "person tries to claim it. First-come-first-served by "
+              "default.",
+              style: TextStyle(fontSize: 12, color: Colors.grey),
+            ),
+            const SizedBox(height: 12),
+            RadioGroup<String>(
+              groupValue: value,
+              onChanged: (v) {
+                if (v != null && !savingOpenShiftPriority) _saveOpenShiftPriority(v);
+              },
+              child: const Column(
+                children: [
+                  RadioListTile<String>(
+                    contentPadding: EdgeInsets.zero,
+                    dense: true,
+                    title: Text("First come, first served"),
+                    value: 'first_come',
+                  ),
+                  RadioListTile<String>(
+                    contentPadding: EdgeInsets.zero,
+                    dense: true,
+                    title: Text("Most senior employee (by hire date)"),
+                    value: 'seniority_first',
+                  ),
+                ],
+              ),
+            ),
+            if (value == 'seniority_first') ...[
+              const SizedBox(height: 4),
+              const Text(
+                "Employees with no hire date set rank below everyone "
+                "who has one — set hire dates on employee profiles for "
+                "this to work as expected.",
+                style: TextStyle(fontSize: 11, color: Colors.grey),
+              ),
+            ],
           ],
         ),
       ),

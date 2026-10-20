@@ -98,14 +98,23 @@ class PushNotificationService {
 
   static Future<void> _registerToken(String userId, String token) async {
     try {
-      // Upsert — unique on (user_id, token). RLS allows the owning
-      // user to insert their own tokens.
-      await _db.from('user_device_tokens').upsert({
-        'user_id': userId,
-        'token': token,
-        'platform': _platform,
-        'updated_at': DateTime.now().toIso8601String(),
-      });
+      // Upsert — conflict target is explicitly (user_id, token), NOT
+      // the table's primary key (the default upsert would use). This
+      // was a real bug: without onConflict, every token refresh or
+      // re-registration silently INSERTED a new row instead of
+      // updating the existing one, since Supabase's upsert() only
+      // matches on the PK unless told otherwise — user_device_tokens
+      // would have accumulated duplicate/stale rows over time. RLS
+      // still allows only the owning user to write their own tokens.
+      await _db.from('user_device_tokens').upsert(
+        {
+          'user_id': userId,
+          'token': token,
+          'platform': _platform,
+          'updated_at': DateTime.now().toIso8601String(),
+        },
+        onConflict: 'user_id,token',
+      );
     } catch (e) {
       debugPrint('Token registration failed (fails open): $e');
     }
