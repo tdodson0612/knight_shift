@@ -6,6 +6,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../core/services/session_service.dart';
 import '../../core/services/role_service.dart';
 import '../../core/services/invite_service.dart';
+import '../../core/utils/friendly_error.dart';
 import '../../shared/models/company_invite.dart';
 import '../manager/manager_dashboard.dart';
 import '../time_clock/home_screen.dart';
@@ -22,6 +23,7 @@ class CompanyGate extends StatefulWidget {
 
 class _CompanyGateState extends State<CompanyGate> {
   bool loading = true;
+  String? acceptingInviteId;
 
   List<CompanyInvite> pendingInvites = [];
 
@@ -36,7 +38,7 @@ class _CompanyGateState extends State<CompanyGate> {
       final user = Supabase.instance.client.auth.currentUser;
 
       if (user == null) {
-        setState(() => loading = false);
+        if (mounted) setState(() => loading = false);
         return;
       }
 
@@ -47,8 +49,8 @@ class _CompanyGateState extends State<CompanyGate> {
       final companyId = SessionService.activeCompanyId;
 
       if (companyId == null) {
-        await loadInvites(user.email ?? '');
-        setState(() => loading = false);
+        await loadInvites();
+        if (mounted) setState(() => loading = false);
         return;
       }
 
@@ -57,48 +59,46 @@ class _CompanyGateState extends State<CompanyGate> {
         userId: userId,
       );
 
-      setState(() => loading = false);
+      if (mounted) setState(() => loading = false);
     } catch (e) {
       debugPrint('CompanyGate boot skipped: $e');
-      setState(() => loading = false);
+      if (mounted) setState(() => loading = false);
     }
   }
 
-  Future<void> loadInvites(String email) async {
-    final res = await Supabase.instance.client
-        .from('company_invites')
-        .select()
-        .eq('email', email)
-        .eq('status', 'pending');
-
-    pendingInvites = List<Map<String, dynamic>>.from(res)
-        .map(CompanyInvite.fromMap)
-        .toList();
+  Future<void> loadInvites() async {
+    pendingInvites = await InviteService.getMyInvites();
   }
 
   Future<void> acceptInvite(CompanyInvite invite) async {
     final user = Supabase.instance.client.auth.currentUser;
-    if (user == null) return;
+    if (user == null || acceptingInviteId != null) return;
 
-    await InviteService.acceptInvite(
-      userId: user.id,
-      email: user.email ?? '',
-      companyId: invite.companyId,
-    );
+    setState(() => acceptingInviteId = invite.id);
 
-    await SessionService.setActiveCompany(
-      companyId: invite.companyId,
-      companyName: invite.companyName ?? 'Company',
-      role: invite.role,
-      userId: user.id,
-    );
+    try {
+      final joined = await InviteService.acceptInvite(invite.id);
 
-    if (!mounted) return;
+      await SessionService.setActiveCompany(
+        companyId: joined.companyId,
+        companyName: joined.companyName,
+        role: joined.role,
+        userId: user.id,
+      );
 
-    Navigator.pushReplacement(
-      context,
-      MaterialPageRoute(builder: (_) => const CompanyGate()),
-    );
+      if (!mounted) return;
+
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (_) => const CompanyGate()),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => acceptingInviteId = null);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(friendlyError(e))),
+      );
+    }
   }
 
   // ----------------------------
@@ -210,8 +210,12 @@ class _CompanyGateState extends State<CompanyGate> {
                     title: Text(invite.companyName ?? 'Company'),
                     subtitle: Text("Role: ${invite.role}"),
                     trailing: ElevatedButton(
-                      onPressed: () => acceptInvite(invite),
-                      child: const Text("Accept"),
+                      onPressed: acceptingInviteId == null
+                          ? () => acceptInvite(invite)
+                          : null,
+                      child: Text(
+                        acceptingInviteId == invite.id ? "Joining..." : "Accept",
+                      ),
                     ),
                   );
                 },

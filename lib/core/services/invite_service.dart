@@ -3,6 +3,7 @@
 import 'supabase_service.dart';
 import 'validation_service.dart';
 import 'subscription_service.dart';
+import 'company_service.dart';
 import '../../shared/models/company_invite.dart';
 
 class InviteService {
@@ -14,7 +15,11 @@ class InviteService {
     required String role,
     double? hourlyRate,
   }) async {
-    final emailError = ValidationService.validateEmail(email);
+    // Emails are compared in lowercase everywhere (the database also
+    // lowercases them), so "John@Gmail.com" matches "john@gmail.com".
+    final normalizedEmail = email.trim().toLowerCase();
+
+    final emailError = ValidationService.validateEmail(normalizedEmail);
     if (emailError != null) throw Exception(emailError);
 
     final roleError = ValidationService.validateRole(role);
@@ -32,61 +37,54 @@ class InviteService {
 
     final existing = await _db
         .from('company_invites')
-        .select()
-        .eq('email', email)
+        .select('id')
+        .eq('email', normalizedEmail)
         .eq('company_id', companyId)
         .eq('status', 'pending')
         .maybeSingle();
 
     if (existing != null) {
-      throw Exception("Invite already exists");
+      throw Exception("An invite for $normalizedEmail is already waiting");
     }
 
     await _db.from('company_invites').insert({
-      'email': email,
+      'email': normalizedEmail,
       'company_id': companyId,
       'role': role,
       'status': 'pending',
-      'created_at': DateTime.now().toIso8601String(),
       if (hourlyRate != null) 'hourly_rate': hourlyRate,
     });
   }
 
-  static Future<void> acceptInvite({
-    required String userId,
-    required String email,
-    required String companyId,
-  }) async {
-    final companyError =
-        ValidationService.validateCompanyId(companyId);
-    if (companyError != null) throw Exception(companyError);
+  /// Pending invites for the signed-in user's email, with company
+  /// names (the `list_my_invites` database function).
+  static Future<List<CompanyInvite>> getMyInvites() async {
+    final res = await _db.rpc('list_my_invites');
 
-    final userError = ValidationService.validateUserId(userId);
-    if (userError != null) throw Exception(userError);
+    return List<Map<String, dynamic>>.from(res as List)
+        .map(
+          (row) => CompanyInvite(
+            id: row['invite_id'].toString(),
+            email: '',
+            role: row['role']?.toString() ?? 'employee',
+            status: 'pending',
+            companyId: row['company_id'].toString(),
+            companyName: row['company_name']?.toString(),
+          ),
+        )
+        .toList();
+  }
 
-    final invite = await _db
-        .from('company_invites')
-        .select()
-        .eq('email', email)
-        .eq('company_id', companyId)
-        .eq('status', 'pending')
-        .maybeSingle();
+  /// Accepts one invite in a single server step (the `accept_invite`
+  /// database function), which checks the invite really is for the
+  /// signed-in user's email before adding them to the company.
+  static Future<CreatedCompany> acceptInvite(String inviteId) async {
+    final res = await _db.rpc(
+      'accept_invite',
+      params: {'p_invite_id': inviteId},
+    );
 
-    if (invite == null) {
-      throw Exception("No valid invite found");
-    }
-
-    await _db.from('company_members').insert({
-      'user_id': userId,
-      'company_id': companyId,
-      'role': invite['role'] ?? 'employee',
-      if (invite['hourly_rate'] != null) 'hourly_rate': invite['hourly_rate'],
-    });
-
-    await _db
-        .from('company_invites')
-        .update({'status': 'accepted'})
-        .eq('id', invite['id']);
+    return CreatedCompany.fromMap(Map<String, dynamic>.from(res as Map));
   }
 
   static Future<List<CompanyInvite>> getCompanyInvites(

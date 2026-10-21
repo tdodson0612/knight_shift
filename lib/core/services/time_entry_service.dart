@@ -1,20 +1,57 @@
 // lib/core/services/time_entry_service.dart
 //
-// Owns time_entries reads/edits for managers, and the audit trail
-// that comes with them. This is a NEW service — previously
-// home_screen.dart called Supabase directly for clock in/out with no
-// dedicated service, and there was no manager-facing edit path at
-// all. Clock in/out in home_screen.dart is left as-is (still works
-// exactly as before); this service adds the missing manager
-// correction + audit capability on top, per the existing
-// trg_time_entry_audit trigger which logs every insert/update/delete
-// automatically regardless of which code path caused it.
+// Owns time_entries: clock in/out for employees (through the
+// `clock_in` / `clock_out` database functions, which stamp the server's
+// time), and reads/edits for managers. Every insert, update and delete
+// is recorded automatically by the trg_time_entry_audit trigger.
 
 import 'supabase_service.dart';
 import '../../shared/models/time_entry_model.dart';
 
 class TimeEntryService {
   static final _db = SupabaseService.client;
+
+  // ----------------------------
+  // CLOCK IN / OUT — server steps. The database stamps the time in the
+  // company's time zone, so a phone's wrong clock can't change hours.
+  // ----------------------------
+
+  /// The signed-in user's open punch at [companyId], or null.
+  static Future<TimeEntry?> getOpenEntry({
+    required String companyId,
+    required String userId,
+  }) async {
+    final res = await _db
+        .from('time_entries')
+        .select()
+        .eq('company_id', companyId)
+        .eq('user_id', userId)
+        .isFilter('clock_out', null)
+        .order('clock_in', ascending: false)
+        .limit(1);
+
+    final rows = List<Map<String, dynamic>>.from(res);
+    return rows.isEmpty ? null : TimeEntry.fromMap(rows.first);
+  }
+
+  static Future<TimeEntry> clockIn({
+    required String companyId,
+    String? photoPath,
+  }) async {
+    final res = await _db.rpc(
+      'clock_in',
+      params: {'p_company_id': companyId, 'p_photo_path': photoPath},
+    );
+    return TimeEntry.fromMap(Map<String, dynamic>.from(res as Map));
+  }
+
+  static Future<TimeEntry> clockOut({required String companyId}) async {
+    final res = await _db.rpc(
+      'clock_out',
+      params: {'p_company_id': companyId},
+    );
+    return TimeEntry.fromMap(Map<String, dynamic>.from(res as Map));
+  }
 
   static Future<List<TimeEntry>> getCompanyTimeEntries({
     required String companyId,

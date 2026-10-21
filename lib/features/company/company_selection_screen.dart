@@ -3,7 +3,9 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../../core/services/company_service.dart';
 import '../../core/services/session_service.dart';
+import '../../core/utils/friendly_error.dart';
 import 'company_gate.dart';
 
 class CompanySelectionScreen extends StatefulWidget {
@@ -16,6 +18,7 @@ class CompanySelectionScreen extends StatefulWidget {
 
 class _CompanySelectionScreenState extends State<CompanySelectionScreen> {
   bool loading = true;
+  bool creating = false;
   List<Map<String, dynamic>> companies = [];
 
   final controller = TextEditingController();
@@ -33,38 +36,61 @@ class _CompanySelectionScreenState extends State<CompanySelectionScreen> {
   }
 
   Future<void> _load() async {
-    final res = await SessionService.getMyCompanies();
-
-    if (!mounted) return;
-
-    setState(() {
-      companies = res;
-      loading = false;
-    });
+    try {
+      final res = await SessionService.getMyCompanies();
+      if (!mounted) return;
+      setState(() {
+        companies = res;
+        loading = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => loading = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(friendlyError(e))),
+      );
+    }
   }
 
   Future<void> _createCompany() async {
     final user = Supabase.instance.client.auth.currentUser;
     final name = controller.text.trim();
 
-    if (user == null || name.isEmpty) return;
+    if (user == null || creating) return;
+    if (name.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Enter a company name")),
+      );
+      return;
+    }
 
-    final company = await Supabase.instance.client
-        .from('companies')
-        .insert({
-          'name': name,
-        })
-        .select()
-        .single();
+    setState(() => creating = true);
 
-    await Supabase.instance.client.from('company_members').insert({
-      'company_id': company['id'],
-      'user_id': user.id,
-      'role': 'manager',
-    });
+    try {
+      final created = await CompanyService.createCompany(name);
 
-    controller.clear();
-    await _load();
+      await SessionService.setActiveCompany(
+        companyId: created.companyId,
+        companyName: created.companyName,
+        role: created.role,
+        userId: user.id,
+      );
+
+      if (!mounted) return;
+      controller.clear();
+
+      Navigator.pushAndRemoveUntil(
+        context,
+        MaterialPageRoute(builder: (_) => const CompanyGate()),
+        (route) => false,
+      );
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => creating = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(friendlyError(e))),
+      );
+    }
   }
 
   Future<void> _enter(Map<String, dynamic> c) async {
@@ -85,9 +111,7 @@ class _CompanySelectionScreenState extends State<CompanySelectionScreen> {
       return;
     }
 
-    // SessionService.setActiveCompany() is synchronous (returns void),
-    // so do NOT await it.
-    SessionService.setActiveCompany(
+    await SessionService.setActiveCompany(
       companyId: companyId,
       companyName: companyName,
       role: role,
@@ -99,11 +123,12 @@ class _CompanySelectionScreenState extends State<CompanySelectionScreen> {
     // Return control to CompanyGate rather than jumping straight to
     // HomeScreen — CompanyGate owns all post-selection routing
     // (role sync, manager vs. employee branching).
-    Navigator.pushReplacement(
+    Navigator.pushAndRemoveUntil(
       context,
       MaterialPageRoute(
         builder: (_) => const CompanyGate(),
       ),
+      (route) => false,
     );
   }
 
@@ -193,8 +218,10 @@ class _CompanySelectionScreenState extends State<CompanySelectionScreen> {
                       SizedBox(
                         width: double.infinity,
                         child: ElevatedButton(
-                          onPressed: _createCompany,
-                          child: const Text("Create Company"),
+                          onPressed: creating ? null : _createCompany,
+                          child: Text(
+                            creating ? "Creating..." : "Create Company",
+                          ),
                         ),
                       ),
                     ],

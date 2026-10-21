@@ -20,6 +20,8 @@ import '../../core/services/geofence_service.dart';
 import '../../shared/models/geofence_settings_model.dart';
 import 'package:geolocator/geolocator.dart';
 import '../../core/services/clock_in_photo_service.dart';
+import '../../core/services/time_entry_service.dart';
+import '../../core/utils/friendly_error.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -43,7 +45,15 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> init() async {
-    await _loadShiftState();
+    try {
+      await _loadShiftState();
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text("Couldn't load your clock status: ${friendlyError(e)}")),
+        );
+      }
+    }
     await _loadUnreadCount();
     await _loadSubscription();
 
@@ -88,24 +98,18 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Future<void> _loadShiftState() async {
     final user = Supabase.instance.client.auth.currentUser;
-    if (user == null) return;
+    final companyId = SessionService.activeCompanyId;
+    if (user == null || companyId == null) return;
 
-    final openShift = await Supabase.instance.client
-        .from('time_entries')
-        .select()
-        .eq('user_id', user.id)
-        .isFilter('clock_out', null)
-        .maybeSingle();
+    final openEntry = await TimeEntryService.getOpenEntry(
+      companyId: companyId,
+      userId: user.id,
+    );
 
     if (!mounted) return;
 
-    if (openShift != null) {
-      clockedIn = true;
-      activeShiftId = openShift['id']?.toString();
-    } else {
-      clockedIn = false;
-      activeShiftId = null;
-    }
+    clockedIn = openEntry != null;
+    activeShiftId = openEntry?.id;
   }
 
   Future<bool> _passesGeofenceCheck(String companyId) async {
@@ -201,7 +205,7 @@ class _HomeScreenState extends State<HomeScreen> {
             if (mounted) {
               setState(() => loading = false);
               ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(content: Text("Couldn't upload photo: \$e"), backgroundColor: Colors.red),
+                SnackBar(content: Text("Couldn't upload photo: ${friendlyError(e)}"), backgroundColor: Colors.red),
               );
             }
             return;
@@ -222,28 +226,15 @@ class _HomeScreenState extends State<HomeScreen> {
           }
         }
 
-        final res = await Supabase.instance.client
-            .from('time_entries')
-            .insert({
-              'user_id': user.id,
-              'company_id': companyId,
-              'clock_in': DateTime.now().toIso8601String(),
-              if (photoPath != null) 'clock_in_photo_path': photoPath,
-            })
-            .select()
-            .single();
+        final entry = await TimeEntryService.clockIn(
+          companyId: companyId,
+          photoPath: photoPath,
+        );
 
         clockedIn = true;
-        activeShiftId = res['id']?.toString();
+        activeShiftId = entry.id;
       } else {
-        if (activeShiftId != null) {
-          await Supabase.instance.client
-              .from('time_entries')
-              .update({
-                'clock_out': DateTime.now().toIso8601String(),
-              })
-              .eq('id', activeShiftId!);
-        }
+        await TimeEntryService.clockOut(companyId: companyId);
 
         clockedIn = false;
         activeShiftId = null;
@@ -252,8 +243,15 @@ class _HomeScreenState extends State<HomeScreen> {
       if (!mounted) return;
 
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("Error: $e")),
+        SnackBar(content: Text(friendlyError(e))),
       );
+      // The server is the source of truth: re-read the real status so
+      // the button never shows the wrong state after an error.
+      try {
+        await _loadShiftState();
+      } catch (_) {
+        // Still offline or failing — keep the current button state.
+      }
     }
 
     if (!mounted) return;
